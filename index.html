@@ -38,6 +38,13 @@
         <!-- iOS benötigt einen Button für Sensor-Rechte -->
         <button class="btn" id="btn-connect">Starten / Sensoren aktivieren</button>
         <p id="status">Nicht verbunden</p>
+
+        <!-- Visual Feedback Canvas -->
+        <canvas id="feedback-canvas" width="300" height="300"
+            style="background: #eee; border-radius: 10px; margin: 10px auto; display: block;"></canvas>
+        <p id="instruction-text" style="font-size: 0.9rem; color: #333;">Halte das Handy senkrecht. Wirf mit einer
+            Bewegung nach oben und klappe das Handgelenk nach vorne!</p>
+
         <div id="debug" style="font-size: 0.7rem; color: #555; margin-top: 20px;"></div>
     </div>
 

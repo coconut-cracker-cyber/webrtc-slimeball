@@ -1,5 +1,4 @@
 // --- KONFIGURATION ---
-// Wir nutzen PeerJS Cloud Server (kostenlos, aber limitiert). Für Produktion eigenen Server nutzen.
 const peerConfig = {
     debug: 2
 };
@@ -51,7 +50,7 @@ function initGame() {
         // Daten vom Handy empfangen
         conn.on('data', (data) => {
             if (data.type === 'throw') {
-                spawnBall(data.forceZ, data.forceY, data.direction);
+                spawnBall(data);
             }
         });
     });
@@ -73,19 +72,39 @@ function initGame() {
     window.addEventListener('resize', resize);
     resize();
 
-    function spawnBall(forceZ, forceY, direction) {
-        // forceZ: Wurfkraft nach vorne (Beschleunigung Z)
-        // forceY: Wurfkraft nach oben (Beschleunigung Y)
-        // direction: Seitliche Neigung (Gamma)
+    function spawnBall(data) {
+        // data enthält: uplift (acc.y), flick (rot.alpha), forward (acc.z), side (acc.x), tilt (gamma)
 
-        // Normalisierung der Werte für das Spiel
-        // forceZ ist typischerweise zwischen 10 und 50 m/s^2 bei einem Wurf
-        const velocityZ = Math.min(Math.max(forceZ, 5), 60) * 1.5; 
-        
-        // forceY ist typischerweise positiv beim Wurf nach oben
-        const velocityY = -Math.min(Math.max(forceY, 5), 30) * 1.2; 
-        
-        const velocityX = direction * 0.5; // Seitliche Drift
+        // Tuning der Physik-Werte
+        // Wir wollen, dass der Wurf nicht "zu hart" ist.
+        // Flick (Rotation) ist der Haupttreiber für die Vorwärtsbewegung (Z).
+        // Uplift (Y-Acc) ist für die Höhe.
+
+        const forceFlick = data.flick || 0;
+        const forceUplift = data.uplift || 0;
+        const forceForward = data.forward || 0;
+        const sideMove = data.side || 0;
+        const tilt = data.tilt || 0;
+
+        // Berechnung der Geschwindigkeiten
+        // Z-Geschwindigkeit (nach vorne)
+        // Rotation (deg/s) kann 300-800 sein. Teilen wir durch ~15-20.
+        // Acc (m/s^2) kann 10-30 sein.
+        let velocityZ = (forceFlick / 12) + (forceForward * 0.5);
+        velocityZ = Math.min(Math.max(velocityZ, 15), 55); // Clamp
+
+        // Y-Geschwindigkeit (nach oben, negativ in Canvas)
+        // Uplift ist meist 10-30.
+        let velocityY = -(forceUplift * 1.5);
+        // Mindesthöhe garantieren, wenn Wurf erkannt wurde
+        if (velocityY > -15) velocityY = -15;
+        if (velocityY < -45) velocityY = -45;
+
+        // X-Geschwindigkeit (seitlich)
+        // Tilt (Gamma) ist -90 bis 90.
+        // Side (Acc.x) ist +/- m/s^2.
+        // Wir mischen beides.
+        let velocityX = (tilt * 0.3) + (sideMove * 2.0);
 
         balls.push({
             x: width / 2,       // Startet unten mittig
@@ -106,9 +125,8 @@ function initGame() {
     function update() {
         ctx.clearRect(0, 0, width, height);
 
-        // 1. Korb zeichnen (2.5D - wird kleiner je weiter weg, hier statisch weit weg)
-        // Einfache Darstellung des Korbs (Backboard + Ring)
-        const depthScale = 1000 / (1000 + hoop.z); // Perspektivische Skalierung
+        // 1. Korb zeichnen (2.5D)
+        const depthScale = 1000 / (1000 + hoop.z);
         const hW = hoop.width * depthScale;
         const hX = hoop.x - hW / 2;
         const hY = hoop.y;
@@ -131,7 +149,6 @@ function initGame() {
         for (let i = balls.length - 1; i >= 0; i--) {
             let b = balls[i];
 
-            // Speichere vorherige Position für Kollisionserkennung
             b.prevX = b.x;
             b.prevY = b.y;
             b.prevZ = b.z;
@@ -141,21 +158,17 @@ function initGame() {
             b.y += b.vy;
             b.z += b.vz;
 
-            b.vy += 0.5; // Schwerkraft zieht nach unten
-            // b.vz verringert sich leicht (Luftwiderstand)
-            b.vz *= 0.99;
+            b.vy += 0.6; // Schwerkraft
+            b.vz *= 0.99; // Luftwiderstand
 
-            // Perspektive berechnen (2.5D)
-            // Je größer Z, desto weiter weg, desto kleiner der Ball
-            // Formel: scale = focalLength / (focalLength + z)
+            // Perspektive
             const focalLength = 1000;
             const scale = focalLength / (focalLength + b.z);
-
             const drawRadius = b.radius * scale;
 
-            // Bodenkollision (simuliert)
-            if (b.y > height + 100) {
-                balls.splice(i, 1); // Ball entfernen wenn aus dem Bild
+            // Bodenkollision
+            if (b.y > height + 200) {
+                balls.splice(i, 1);
                 continue;
             }
 
@@ -168,42 +181,26 @@ function initGame() {
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Pseudo-Schatten für 3D Effekt
+            // Pseudo-Schatten
             ctx.beginPath();
             ctx.arc(b.x + 5 * scale, b.y + 5 * scale, Math.max(drawRadius, 1) * 0.8, 0, Math.PI * 2);
             ctx.fillStyle = "rgba(0,0,0,0.1)";
             ctx.fill();
 
-
-            // Verbesserte Kollisionserkennung (Durchgangsprüfung)
+            // Kollisionserkennung
             if (!b.scored && b.prevZ < hoop.z && b.z >= hoop.z) {
-                // Ball hat die Tiefe des Korbs durchquert
-                // Interpoliere Position genau bei hoop.z
+                // Interpolation
                 const t = (hoop.z - b.prevZ) / (b.z - b.prevZ);
                 const intersectX = b.prevX + (b.x - b.prevX) * t;
                 const intersectY = b.prevY + (b.y - b.prevY) * t;
 
-                // Prüfe Abstand zum Korbzentrum
-                // Korb ist bei hoop.x, hoop.y
-                // Ringradius ist hW / 2 (skaliert) -> aber wir rechnen im Weltraum (ungefähr)
-                // Da hoop.x/y Bildschirmkoordinaten sind, müssen wir aufpassen.
-                // Der Ball x/y sind auch Bildschirmkoordinaten (projiziert?).
-                // Nein, Ball x/y sind Weltkoordinaten in diesem einfachen Modell, die direkt gezeichnet werden (mit Radius-Skalierung).
-                // Moment: b.x wird direkt gezeichnet. Also sind b.x/b.y Bildschirmkoordinaten.
-                // hoop.x/hoop.y sind auch Bildschirmkoordinaten.
-                
-                // Wir müssen prüfen, ob der Ball DURCH den Ring fällt.
-                // Da wir von "vorne" werfen, muss der Ball von oben kommen?
-                // Eigentlich ja, aber bei diesem einfachen 2.5D ist Y einfach Höhe.
-                // Wenn b.vy > 0 (fällt nach unten) ist es ein Korb.
-                
+                // Prüfe ob Ball durch Ring fällt (vy > 0)
                 if (b.vy > 0) {
                     const dist = Math.sqrt((intersectX - hoop.x) ** 2 + (intersectY - hoop.y) ** 2);
-                    // Toleranzradius etwas kleiner als Ringbreite
-                    if (dist < (hoop.width * depthScale / 2) * 0.8) {
+                    if (dist < (hoop.width * depthScale / 2) * 0.85) {
                         score++;
                         b.scored = true;
-                        b.color = "#0f0"; // Visuelles Feedback
+                        b.color = "#0f0";
                         document.getElementById('score').innerText = score;
                     }
                 }
@@ -224,20 +221,20 @@ function initController(hostId) {
     const statusEl = document.getElementById('status');
     const btn = document.getElementById('btn-connect');
     const debugEl = document.getElementById('debug');
-    const visualBall = document.getElementById('visual-feedback');
+    const canvas = document.getElementById('feedback-canvas');
+    const ctx = canvas.getContext('2d');
 
     const peer = new Peer(null, peerConfig);
     let conn = null;
 
-    // PeerJS Verbindung aufbauen
     peer.on('open', (id) => {
         statusEl.innerText = "Verbinde mit Desktop...";
         conn = peer.connect(hostId);
 
         conn.on('open', () => {
-            statusEl.innerText = "Verbunden! Bereit zum Werfen.";
+            statusEl.innerText = "Verbunden! Bereit.";
             statusEl.style.color = "#0f0";
-            btn.innerText = "Sensoren neu kalibrieren"; // Button ändert Zweck
+            btn.innerText = "Sensoren neu kalibrieren";
         });
 
         conn.on('error', (err) => {
@@ -245,11 +242,79 @@ function initController(hostId) {
         });
     });
 
-    // Sensoren Logik
-    let throwThreshold = 15; // Schwellenwert für Wurferkennung (m/s^2)
-    let canThrow = true;
+    // Sensor Variablen
+    let acc = { x: 0, y: 0, z: 0 };
+    let rot = { alpha: 0, beta: 0, gamma: 0 };
+    let tilt = { alpha: 0, beta: 0, gamma: 0 }; // Orientation
 
-    // iOS 13+ benötigt explizite Erlaubnis für Sensoren
+    let canThrow = true;
+    const THROW_THRESHOLD = 25; // Kombinierter Wert aus Rotation und Uplift
+
+    // Visualisierung Loop
+    function drawLoop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const w = canvas.width;
+        const h = canvas.height;
+        const cx = w / 2;
+        const cy = h / 2;
+
+        // Hintergrund-Gitter
+        ctx.strokeStyle = "#ddd";
+        ctx.beginPath();
+        ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
+        ctx.moveTo(0, cy); ctx.lineTo(w, cy);
+        ctx.stroke();
+
+        // 1. Optimale Wurflinie (Referenz)
+        ctx.strokeStyle = "rgba(0, 200, 0, 0.3)";
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx, cy - 100); // Gerade nach oben
+        ctx.stroke();
+
+        // Text: "Optimal"
+        ctx.fillStyle = "green";
+        ctx.font = "12px Arial";
+        ctx.fillText("Optimal: Gerade hoch & Flick", cx + 10, cy - 80);
+
+
+        // 2. Aktueller Vektor (Live Feedback)
+        // Wir visualisieren Uplift (Y) und Side (X)
+        // Und Flick als Länge oder Farbe?
+        // Nehmen wir: Y-Achse = Uplift + Flick, X-Achse = Tilt + Side
+
+        const flick = Math.abs(rot.alpha || 0);
+        const uplift = acc.y || 0;
+        const side = (acc.x || 0) * 5 + (tilt.gamma || 0); // Mix aus Bewegung und Neigung
+
+        // Vektor berechnen
+        const vecY = (uplift * 5) + (flick * 0.2); // Skalierung für Anzeige
+        const vecX = side * 2;
+
+        ctx.strokeStyle = "orange";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + vecX, cy - vecY);
+        ctx.stroke();
+
+        // Pfeilspitze
+        ctx.beginPath();
+        ctx.arc(cx + vecX, cy - vecY, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Debug Text
+        ctx.fillStyle = "#333";
+        ctx.fillText(`Flick (Rot): ${flick.toFixed(0)}`, 10, 20);
+        ctx.fillText(`Uplift (Y): ${uplift.toFixed(1)}`, 10, 40);
+        ctx.fillText(`Side (X/Tilt): ${side.toFixed(1)}`, 10, 60);
+
+        requestAnimationFrame(drawLoop);
+    }
+    drawLoop();
+
+
     btn.addEventListener('click', () => {
         if (typeof DeviceMotionEvent.requestPermission === 'function') {
             DeviceMotionEvent.requestPermission()
@@ -262,75 +327,59 @@ function initController(hostId) {
                 })
                 .catch(console.error);
         } else {
-            // Android oder älteres iOS
             startSensors();
         }
     });
 
     function startSensors() {
-        window.addEventListener('devicemotion', handleMotion);
-        statusEl.innerText = "Sensoren aktiv. Wirf!";
+        window.addEventListener('devicemotion', (event) => {
+            if (event.acceleration) acc = event.acceleration;
+            if (event.rotationRate) rot = event.rotationRate;
+            handleThrowLogic();
+        });
+        window.addEventListener('deviceorientation', (event) => {
+            if (event.gamma) tilt.gamma = event.gamma;
+            if (event.beta) tilt.beta = event.beta;
+            if (event.alpha) tilt.alpha = event.alpha;
+        });
+        statusEl.innerText = "Sensoren aktiv!";
     }
 
-    let tiltLR = 0; // Neigung links/rechts
+    function handleThrowLogic() {
+        if (!conn || !canThrow) return;
 
-    // Gyro/Orientation für die Richtung (Gamma: -90 bis 90)
-    window.addEventListener('deviceorientation', (event) => {
-        // Wir nutzen Gamma (Neigung links/rechts) zum Zielen
-        if (event.gamma) {
-            tiltLR = event.gamma;
-            // Visuelles Feedback auf dem Handy
-            visualBall.style.transform = `translateX(${tiltLR}px)`;
-        }
-    });
+        // Wurf-Erkennung:
+        // Wir suchen nach starkem Uplift (Y) UND starker Rotation (Alpha - Flick nach vorne)
 
-    function handleMotion(event) {
-        if (!conn) return;
+        const flick = Math.abs(rot.alpha || 0);
+        const uplift = acc.y || 0;
 
-        const acc = event.acceleration; // Beschleunigung ohne Gravitation
-        if (!acc) return;
+        // Score berechnen (wie stark ist der Wurf)
+        // Flick ist meist 100-500 deg/s bei schnellem Wurf
+        // Uplift ist 10-30 m/s^2
+        const intensity = (uplift * 1.0) + (flick / 10.0);
 
-        // Wirf-Logik:
-        // Wir suchen nach einer starken Beschleunigung nach "vorne" (Z) und "oben" (Y).
-        // Bei Portrait-Mode:
-        // +Y ist oben (Richtung Himmel, wenn Handy senkrecht)
-        // -Z ist weg vom User (in den Bildschirm hinein) oder +Z (aus dem Bildschirm raus)
-        // Das hängt vom Browser/OS ab. Wir nehmen den Betrag von Z.
-        
-        // Wir nehmen an, dass ein Wurf eine starke Beschleunigung in Z und Y hat.
-        const forceZ = Math.abs(acc.z);
-        const forceY = acc.y; 
-
-        // Gesamtkraft für Threshold
-        const totalForce = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
-
-        // Debug
-        // debugEl.innerText = `Z: ${acc.z.toFixed(1)} | Y: ${acc.y.toFixed(1)} | Tot: ${totalForce.toFixed(1)}`;
-
-        if (canThrow && totalForce > throwThreshold) {
+        if (intensity > THROW_THRESHOLD) {
             // Wurf erkannt!
-            // Wir senden die Komponenten, um die Flugkurve zu berechnen
-            
-            // Nur werfen, wenn auch eine gewisse Vorwärts/Aufwärts-Komponente da ist
-            if (forceZ > 5 || forceY > 5) {
-                canThrow = false;
+            canThrow = false;
 
-                conn.send({
-                    type: 'throw',
-                    forceZ: forceZ,
-                    forceY: forceY,
-                    direction: tiltLR
-                });
+            // Daten senden
+            conn.send({
+                type: 'throw',
+                uplift: uplift,
+                flick: flick,
+                forward: Math.abs(acc.z || 0),
+                side: acc.x || 0,
+                tilt: tilt.gamma || 0
+            });
 
-                // Visuelles Feedback
-                document.body.style.backgroundColor = "#555";
-                setTimeout(() => { document.body.style.backgroundColor = "#333"; }, 100);
+            // Feedback
+            const screen = document.getElementById('controller-screen');
+            screen.style.backgroundColor = "#4caf50"; // Grün aufleuchten
+            setTimeout(() => { screen.style.backgroundColor = "#333"; }, 200);
 
-                // Cooldown
-                setTimeout(() => {
-                    canThrow = true;
-                }, 800);
-            }
+            // Cooldown
+            setTimeout(() => { canThrow = true; }, 1000);
         }
     }
 }
