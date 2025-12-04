@@ -3,417 +3,454 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sensor Data Visualizer v2</title>
+    <title>WebRTC Basketball 2.5D - Physik Update</title>
     
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <!-- Externe Bibliotheken für QR-Code und WebRTC (PeerJS) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
 
     <style>
-        :root {
-            --bg-color: #121212;
-            --card-bg: #1e1e1e;
-            --text-color: #e0e0e0;
-            --accent-color: #00e676;
-            --bar-color: #2979ff;
-        }
-
         body {
-            font-family: 'Segoe UI', sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
             margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-
-        /* --- DESKTOP STYLES --- */
-        #desktop-view {
-            display: none;
-            width: 90%;
-            max-width: 900px;
-        }
-
-        .grid-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-
-        .card {
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
-        }
-
-        h2 { margin-top: 0; color: var(--accent-color); font-size: 1.2rem; border-bottom: 1px solid #333; padding-bottom: 10px;}
-
-        /* Balken Diagramme */
-        .axis-row { display: flex; align-items: center; margin-bottom: 8px; }
-        .axis-label { width: 30px; font-weight: bold; color: #aaa; }
-        .axis-val { width: 50px; text-align: right; font-family: monospace; font-size: 0.9rem; }
-        
-        .bar-track {
-            flex-grow: 1;
-            height: 8px;
-            background: #333;
-            border-radius: 4px;
-            margin: 0 10px;
-            position: relative;
             overflow: hidden;
-        }
-        
-        .bar-fill {
-            height: 100%;
-            background: var(--bar-color);
-            position: absolute;
-            left: 50%;
-            width: 0;
-            transition: width 0.05s, left 0.05s; /* Sehr schnell für Echtzeit */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #222;
+            color: white;
+            touch-action: none; /* Verhindert Zoom auf Mobile */
         }
 
-        /* 3D Würfel zur Orientierung */
-        .scene { width: 80px; height: 80px; perspective: 300px; margin: 20px auto; }
-        .cube {
-            width: 100%; height: 100%;
-            position: relative;
-            transform-style: preserve-3d;
-            transition: transform 0.1s;
-        }
-        .face {
-            position: absolute; width: 80px; height: 80px;
-            border: 2px solid var(--accent-color);
-            background: rgba(0, 230, 118, 0.1);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 12px; opacity: 0.8;
-        }
-        .front  { transform: rotateY(  0deg) translateZ(40px); }
-        .back   { transform: rotateY(180deg) translateZ(40px); }
-        .right  { transform: rotateY( 90deg) translateZ(40px); }
-        .left   { transform: rotateY(-90deg) translateZ(40px); }
-        .top    { transform: rotateX( 90deg) translateZ(40px); }
-        .bottom { transform: rotateX(-90deg) translateZ(40px); }
-
-        #qrcode { background: white; padding: 10px; border-radius: 10px; display: inline-block; }
-
-        /* --- MOBILE STYLES --- */
-        #mobile-view {
+        /* Styles für den Desktop/Main Screen */
+        #game-screen {
             display: none;
-            width: 100%;
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        #canvas {
+            background: linear-gradient(to bottom, #87CEEB 0%, #E0F7FA 100%); /* Himmel Verlauf */
+            display: block;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            pointer-events: none; /* Klicks gehen durch */
+        }
+
+        #qrcode {
+            margin-top: 10px;
+            background: white;
+            padding: 10px;
+            display: inline-block;
+        }
+
+        /* Styles für den Handy Controller */
+        #controller-screen {
+            display: none;
+            width: 100vw;
             height: 100vh;
             flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
+            background-color: #333;
             text-align: center;
-            background: radial-gradient(circle at center, #2a2a2a 0%, #121212 100%);
         }
 
-        .sensor-value-big {
-            font-size: 2.5rem;
-            font-weight: bold;
-            color: var(--accent-color);
-            margin: 20px 0;
-        }
-
-        .btn-action {
-            background: linear-gradient(45deg, #00e676, #00c853);
-            color: black;
+        .btn {
+            background: #ff9800;
+            color: white;
             border: none;
             padding: 20px 40px;
-            font-size: 1.2rem;
+            font-size: 1.5rem;
             border-radius: 50px;
-            box-shadow: 0 10px 20px rgba(0, 230, 118, 0.3);
             cursor: pointer;
-            transition: transform 0.1s;
+            margin-top: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
-        .btn-action:active { transform: scale(0.95); }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        #status {
+            margin-top: 20px;
+            color: #aaa;
+        }
+
+        .ball-preview {
+            width: 100px;
+            height: 100px;
+            background: orange;
+            border-radius: 50%;
+            margin-bottom: 50px;
+            border: 2px solid #fff;
+            transition: transform 0.1s; /* Weiche Animation für Feedback */
+        }
     </style>
 </head>
 <body>
 
-    <!-- DESKTOP ANSICHT -->
-    <div id="desktop-view">
-        <div style="text-align: center; margin-bottom: 20px;">
-            <h1>Sensor Dashboard <span style="font-size:0.5em; color:#666">(WebRTC)</span></h1>
-            <div id="connection-info">
-                <div id="qrcode"></div>
-                <p id="desktop-status">Warte auf Handy-Scan...</p>
-            </div>
-        </div>
-
-        <div class="grid-container">
-            <!-- KARTE 1: Lineare Beschleunigung (Ohne Gravitation) -->
-            <div class="card">
-                <h2>Lineare Beschleunigung (Wurf)</h2>
-                <p style="font-size: 0.8rem; color: #888;">Misst reine Bewegungskraft ohne Schwerkraft.</p>
-                
-                <!-- X -->
-                <div class="axis-row">
-                    <span class="axis-label">X</span>
-                    <div class="bar-track"><div class="bar-fill" id="bar-x"></div></div>
-                    <span class="axis-val" id="val-x">0.0</span>
-                </div>
-                <!-- Y -->
-                <div class="axis-row">
-                    <span class="axis-label">Y</span>
-                    <div class="bar-track"><div class="bar-fill" id="bar-y"></div></div>
-                    <span class="axis-val" id="val-y">0.0</span>
-                </div>
-                <!-- Z -->
-                <div class="axis-row">
-                    <span class="axis-label">Z</span>
-                    <div class="bar-track"><div class="bar-fill" id="bar-z"></div></div>
-                    <span class="axis-val" id="val-z">0.0</span>
-                </div>
-                
-                <div style="margin-top:15px; text-align:center">
-                    <div style="font-size: 0.8rem">Gesamtkraft (Vektor):</div>
-                    <div id="total-force" style="font-size: 2rem; font-weight: bold; color: white;">0.0</div>
-                </div>
-            </div>
-
-            <!-- KARTE 2: Orientierung (Gyroskop) -->
-            <div class="card">
-                <h2>Orientierung (Rotation)</h2>
-                <div class="scene">
-                    <div class="cube" id="gyro-cube">
-                        <div class="face front">Vorn</div>
-                        <div class="face back">Hinten</div>
-                        <div class="face right">Rechts</div>
-                        <div class="face left">Links</div>
-                        <div class="face top">Oben</div>
-                        <div class="face bottom">Unten</div>
-                    </div>
-                </div>
-                <div style="display: flex; justify-content: space-around; font-family: monospace;">
-                    <div>A: <span id="val-alpha">0</span>°</div>
-                    <div>B: <span id="val-beta">0</span>°</div>
-                    <div>G: <span id="val-gamma">0</span>°</div>
-                </div>
-            </div>
+    <!-- DESKTOP GAME SCREEN -->
+    <div id="game-screen">
+        <canvas id="canvas"></canvas>
+        <div id="ui-layer">
+            <h1>Streetball 2.5D - Physics Pro</h1>
+            <p>Punkte: <span id="score">0</span></p>
+            <p>Scanne, um beizutreten:</p>
+            <div id="qrcode"></div>
+            <p style="font-size: 0.8rem; margin-top:5px;">Status: <span id="desktop-status">Warte auf Verbindung...</span></p>
+            <p style="font-size: 0.7rem; color:#ccc">Tipp: Halte das Handy senkrecht für hohe Würfe, flach für flache Pässe.</p>
         </div>
     </div>
 
-    <!-- MOBILE ANSICHT -->
-    <div id="mobile-view">
-        <div style="margin-bottom: 30px;">
-            <h2>Controller Modus</h2>
-            <p id="mobile-status" style="color: #888;">Verbindung wird aufgebaut...</p>
-        </div>
-
-        <div class="sensor-value-big" id="mobile-force-display">0.0</div>
-        <p>m/s² (Kraft)</p>
-
-        <button id="btn-start" class="btn-action" style="margin-top: 40px;">Sensoren Starten</button>
+    <!-- MOBILE CONTROLLER SCREEN -->
+    <div id="controller-screen">
+        <div class="ball-preview" id="visual-feedback"></div>
+        <h2>Controller</h2>
+        <p>Halte das Handy wie einen Ball.</p>
+        <p>Ziel mit Neigung (Hoch/Runter/Links/Rechts)</p>
+        <p>Mache eine Wurfbewegung nach vorne!</p>
         
-        <p style="margin-top: 50px; font-size: 0.8rem; color: #555; max-width: 80%;">
-            Hinweis: iOS benötigt HTTPS und diesen Klick-Button. Android startet meist sofort.
-        </p>
+        <!-- iOS benötigt einen Button für Sensor-Rechte -->
+        <button class="btn" id="btn-connect">Starten / Sensoren aktivieren</button>
+        <p id="status">Nicht verbunden</p>
+        <div id="debug" style="font-size: 0.7rem; color: #555; margin-top: 20px;"></div>
     </div>
 
     <script>
-        // --- SETUP ---
-        const peerConfig = {}; // PeerJS Cloud Server (Standard)
+        // --- KONFIGURATION ---
+        // Wir nutzen PeerJS Cloud Server für das WebRTC Handshake
+        const peerConfig = {
+            debug: 2
+        };
+
+        // URL Parameter prüfen um Modus zu bestimmen
         const urlParams = new URLSearchParams(window.location.search);
-        const mode = urlParams.get('mode');
-        const hostId = urlParams.get('host');
+        const mode = urlParams.get('mode'); // 'controller' oder null (desktop)
+        const hostId = urlParams.get('id'); // ID des Desktops
 
-        // --- ROUTING ---
+        // --- LOGIK WEICHE ---
         if (mode === 'controller' && hostId) {
-            initMobile(hostId);
+            initController(hostId);
         } else {
-            initDesktop();
+            initGame();
         }
 
-        // ================= DESKTOP =================
-        function initDesktop() {
-            document.getElementById('desktop-view').style.display = 'block';
-            const peer = new Peer(null, peerConfig);
-
-            peer.on('open', (id) => {
-                const url = `${window.location.href.split('?')[0]}?mode=controller&host=${id}`;
-                new QRCode(document.getElementById("qrcode"), { text: url, width: 180, height: 180 });
-                console.log("Desktop ID:", id);
-            });
-
-            peer.on('connection', (conn) => {
-                document.getElementById('desktop-status').innerText = "✅ Handy verbunden!";
-                document.getElementById('desktop-status').style.color = "var(--accent-color)";
-                document.getElementById('qrcode').style.opacity = "0.3"; // QR ausgrauen
-
-                conn.on('data', (data) => {
-                    if (data.type === 'sensorData') {
-                        renderData(data);
-                    }
-                });
-            });
-        }
-
-        function renderData(data) {
-            const { acc, rot } = data;
-
-            // 1. Beschleunigung (Linear Acceleration)
-            // Range ca. -20 bis +20 m/s^2
-            updateBar('bar-x', 'val-x', acc.x);
-            updateBar('bar-y', 'val-y', acc.y);
-            updateBar('bar-z', 'val-z', acc.z);
-
-            // Gesamtkraft berechnen
-            const totalForce = Math.sqrt(acc.x**2 + acc.y**2 + acc.z**2);
-            document.getElementById('total-force').innerText = totalForce.toFixed(1);
-
-            // Wurf-Indikator (Visuell)
-            if (totalForce > 15) {
-                document.getElementById('total-force').style.color = "#ff4081"; // Rot bei starkem Wurf
-            } else {
-                document.getElementById('total-force').style.color = "white";
-            }
-
-            // 2. Rotation
-            document.getElementById('val-alpha').innerText = Math.round(rot.alpha);
-            document.getElementById('val-beta').innerText = Math.round(rot.beta);
-            document.getElementById('val-gamma').innerText = Math.round(rot.gamma);
-
-            const cube = document.getElementById('gyro-cube');
-            // Anpassung für intuitive Ansicht:
-            // Beta dreht um X (Vor/Zurück kippen)
-            // Gamma dreht um Y (Seitlich kippen) im CSS-Kontext oft andersherum mappen
-            cube.style.transform = `rotateX(${-rot.beta}deg) rotateY(${rot.gamma}deg) rotateZ(${rot.alpha}deg)`;
-        }
-
-        function updateBar(barId, valId, value) {
-            const elBar = document.getElementById(barId);
-            const elVal = document.getElementById(valId);
-            elVal.innerText = value.toFixed(1);
+        // ==========================================
+        // TEIL 1: DESKTOP / GAME LOGIC
+        // ==========================================
+        function initGame() {
+            document.getElementById('game-screen').style.display = 'block';
             
-            // Mapping: -20 bis 20 auf 0% bis 100%
-            // 0 ist 50%
-            let percent = 50 + (value * 2.5); 
-            percent = Math.max(0, Math.min(100, percent)); // Clamp
-
-            if (value > 0) {
-                elBar.style.left = "50%";
-                elBar.style.width = (percent - 50) + "%";
-            } else {
-                elBar.style.left = percent + "%";
-                elBar.style.width = (50 - percent) + "%";
-            }
-        }
-
-        // ================= MOBILE =================
-        function initMobile(targetId) {
-            document.getElementById('mobile-view').style.display = 'flex';
-            const status = document.getElementById('mobile-status');
-            const btn = document.getElementById('btn-start');
-            const forceDisplay = document.getElementById('mobile-force-display');
-
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            let score = 0;
+            let width, height;
+            
+            // PeerJS Setup
             const peer = new Peer(null, peerConfig);
             let conn = null;
 
             peer.on('open', (id) => {
-                status.innerText = "Verbinde mit Desktop...";
-                conn = peer.connect(targetId);
-
-                conn.on('open', () => {
-                    status.innerText = "✅ Verbunden. Sensoren starten!";
-                    status.style.color = "var(--accent-color)";
+                console.log('Meine Peer ID ist: ' + id);
+                
+                // QR Code generieren
+                const joinUrl = `${window.location.href.split('?')[0]}?mode=controller&id=${id}`;
+                new QRCode(document.getElementById("qrcode"), {
+                    text: joinUrl,
+                    width: 128,
+                    height: 128
                 });
             });
 
-            btn.addEventListener('click', async () => {
-                // iOS 13+ Permission Request
-                if (typeof DeviceMotionEvent.requestPermission === 'function') {
-                    try {
-                        const response = await DeviceMotionEvent.requestPermission();
-                        if (response === 'granted') {
-                            startSensors();
-                            btn.style.display = 'none';
-                        } else {
-                            alert("Sensoren müssen erlaubt werden!");
-                        }
-                    } catch (e) {
-                        console.error(e);
+            peer.on('connection', (c) => {
+                conn = c;
+                document.getElementById('desktop-status').innerText = "Controller verbunden!";
+                document.getElementById('desktop-status').style.color = "#0f0";
+
+                // Daten vom Handy empfangen
+                conn.on('data', (data) => {
+                    if (data.type === 'throw') {
+                        // Hier kommen die rohen Sensordaten an.
+                        // data.force: Gesamtkraft des Wurfs (Beschleunigung)
+                        // data.beta: Neigung Vor/Zurück (-180 bis 180)
+                        // data.gamma: Neigung Links/Rechts (-90 bis 90)
+                        spawnBall(data.force, data.beta, data.gamma);
                     }
+                });
+            });
+
+            // Spiel-Objekte
+            const balls = [];
+            // Korb Definition: Z ist die Tiefe (500 Einheiten weg)
+            const hoop = { x: 0, y: 0, width: 120, height: 10, z: 500 }; 
+
+            // Resize Handler
+            function resize() {
+                width = window.innerWidth;
+                height = window.innerHeight;
+                canvas.width = width;
+                canvas.height = height;
+                // Korb positionieren
+                hoop.x = width / 2;
+                hoop.y = height * 0.35; 
+            }
+            window.addEventListener('resize', resize);
+            resize();
+
+            /**
+             * Erstellt einen Ball basierend auf den physikalischen Parametern des Wurfs.
+             * Implementiert die "Gravity Penalty" und winkelabhängige Geschwindigkeit.
+             */
+            function spawnBall(force, beta, gamma) {
+                // 1. FIX LINKS/RECHTS: 
+                // Gamma ist die Neigung nach rechts. 
+                // Vorher war es reversed, also multiplizieren wir mit -1 (bzw. negativer Faktor).
+                // Ein Faktor von 0.5 dämpft die Seitwärtsbewegung etwas, damit man leichter zielt.
+                const velocityX = gamma * -0.4; 
+
+                // 2. WINKEL BESTIMMUNG (HOCH/RUNTER):
+                // Beta ist die Neigung des Handys.
+                // ~90 Grad: Handy steht aufrecht (Wurf nach oben/vorne)
+                // ~0 Grad: Handy liegt flach (Wurf nach unten/vorne)
+                // Wir definieren einen "Neutralpunkt" bei ca. 45 Grad.
+                // Alles über 45 Grad wirft nach oben (Y-Velocity negativ im Canvas), alles darunter flach/runter.
+                // Wir normalisieren das grob auf einen Faktor zwischen -1 (sehr flach) und 1 (sehr steil).
+                const angleFactor = (beta - 45) / 45; 
+
+                // 3. SCHWERKRAFT-LOGIK ("Gravity Penalty"):
+                // Der Prompt verlangt: "throwing upwards takes more force since gravity is pulling".
+                // Wenn angleFactor > 0 (Wurf nach oben), reduzieren wir die effektive Kraft.
+                let effectiveForce = force;
+                if (angleFactor > 0) {
+                    // Je steiler der Wurf, desto mehr Kraft geht "verloren" um gegen die Schwerkraft anzukommen.
+                    // Wir ziehen hier pauschal einen Wert ab, skaliert mit der Steilheit.
+                    const gravityDrag = angleFactor * 5; 
+                    effectiveForce = Math.max(force - gravityDrag, 0); // Kraft kann nicht negativ sein
+                }
+
+                // 4. AUFTEILUNG DER KRAFT (Vektoren):
+                // Wir teilen die 'effectiveForce' auf in Geschwindigkeit nach oben (Y) und in die Tiefe (Z).
+                
+                // Z-Geschwindigkeit (Tiefe):
+                // Wenn wir sehr steil nach oben werfen (hoher angleFactor), geht weniger Energie in die Tiefe.
+                // Wir nutzen Cosinus-ähnliche Annäherung: (1 - abs(angleFactor) * 0.5)
+                const velocityZ = effectiveForce * 1.5 * (1 - Math.abs(angleFactor) * 0.3);
+
+                // Y-Geschwindigkeit (Höhe):
+                // Negativ = Nach oben im Canvas.
+                // Wir multiplizieren die Kraft mit dem Winkelfaktor.
+                // Ein starker Wurf (viel Force) bei steilem Winkel (hoher angleFactor) gibt viel Upward-Velocity.
+                const velocityY = -1 * effectiveForce * angleFactor * 2.5;
+
+                // Ball Objekt erstellen
+                balls.push({
+                    x: width / 2,       // Startet unten mittig
+                    y: height, 
+                    z: 0,               // Startet "ganz vorne" (Z=0)
+                    vx: velocityX,      // Seitliche Drift
+                    vy: velocityY,      // Vertikale Geschwindigkeit (berechnet mit Schwerkraft-Penalty)
+                    vz: velocityZ,      // Tiefengeschwindigkeit
+                    radius: 40,         // Startradius in Pixeln
+                    color: 'orange',
+                    scored: false
+                });
+            }
+
+            function update() {
+                ctx.clearRect(0, 0, width, height);
+
+                // --- HINTERGRUND & KORB (2.5D) ---
+                // Je größer Z, desto kleiner wird alles (Perspektive)
+                const focalLength = 800; // "Brennweite" der Kamera
+                const depthScale = focalLength / (focalLength + hoop.z);
+                
+                const hW = hoop.width * depthScale;
+                const hX = hoop.x - hW / 2;
+                const hY = hoop.y;
+                
+                // Backboard zeichnen
+                ctx.fillStyle = "white";
+                ctx.fillRect(hX - 20 * depthScale, hY - 80 * depthScale, hW + 40 * depthScale, 80 * depthScale);
+                ctx.strokeStyle = "red";
+                ctx.strokeRect(hX + hW*0.3, hY - 60*depthScale, hW*0.4, 40*depthScale);
+
+                // Ring zeichnen (Ellipse um Tiefe anzudeuten)
+                ctx.beginPath();
+                ctx.ellipse(hoop.x, hY, hW/2, 10 * depthScale, 0, 0, Math.PI * 2);
+                ctx.lineWidth = 5;
+                ctx.strokeStyle = "orange";
+                ctx.stroke();
+
+                // --- BÄLLE PHYSIK & RENDERING ---
+                for (let i = balls.length - 1; i >= 0; i--) {
+                    let b = balls[i];
+
+                    // Positions-Update
+                    b.x += b.vx;
+                    b.y += b.vy;
+                    b.z += b.vz;
+                    
+                    // Physik: Schwerkraft wirkt immer nach unten (erhöht Y)
+                    b.vy += 0.5; 
+                    
+                    // Luftwiderstand (optional, macht es realistischer)
+                    b.vz *= 0.99; 
+
+                    // Perspektive berechnen (2.5D Logik wie gefordert)
+                    // Formel: scale = focalLength / (focalLength + z)
+                    // Z wächst, wenn der Ball wegfliegt -> scale wird kleiner -> Ball wird kleiner
+                    const scale = focalLength / (focalLength + b.z);
+                    
+                    const drawRadius = b.radius * scale;
+                    
+                    // Wenn Ball unten aus dem Bild fällt -> Löschen
+                    if (b.y > height + 200) {
+                        balls.splice(i, 1); 
+                        continue;
+                    }
+
+                    // Ball zeichnen
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, Math.max(drawRadius, 1), 0, Math.PI * 2);
+                    ctx.fillStyle = b.color;
+                    ctx.fill();
+                    ctx.strokeStyle = "#333";
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    // --- KOLLISIONSERKENNUNG (Treffer) ---
+                    // Wir prüfen, ob der Ball ungefähr die Tiefe des Korbs erreicht hat (Z-Achse)
+                    if (!b.scored && Math.abs(b.z - hoop.z) < 50) { 
+                         // Wir prüfen, ob der Ball innerhalb des Ring-Radius ist (X-Achse)
+                         // und ob er von oben kommt (vy > 0)
+                         if (Math.abs(b.x - hoop.x) < (hW/2) && Math.abs(b.y - hoop.y) < 30 && b.vy > 0) {
+                             score++; // Punkt!
+                             b.scored = true;
+                             b.color = "#00ff00"; // Grünes Feedback
+                             document.getElementById('score').innerText = score;
+                         }
+                    }
+                }
+
+                requestAnimationFrame(update);
+            }
+
+            update();
+        }
+
+        // ==========================================
+        // TEIL 2: MOBILE CONTROLLER LOGIC
+        // ==========================================
+        function initController(hostId) {
+            document.getElementById('controller-screen').style.display = 'flex';
+            const statusEl = document.getElementById('status');
+            const btn = document.getElementById('btn-connect');
+            const visualBall = document.getElementById('visual-feedback');
+
+            const peer = new Peer(null, peerConfig);
+            let conn = null;
+
+            // Verbindung zum Desktop aufbauen
+            peer.on('open', (id) => {
+                statusEl.innerText = "Verbinde mit Desktop...";
+                conn = peer.connect(hostId);
+
+                conn.on('open', () => {
+                    statusEl.innerText = "Verbunden! Ausrichtung kalibriert.";
+                    statusEl.style.color = "#0f0";
+                    btn.innerText = "Neu kalibrieren"; 
+                });
+
+                conn.on('error', (err) => {
+                    statusEl.innerText = "Fehler: " + err;
+                });
+            });
+
+            // Variablen für Sensordaten
+            let lastAccZ = 0;
+            let throwThreshold = 15; // Mindestkraft für einen Wurf (m/s^2)
+            let canThrow = true;
+            
+            // Orientierungs-Variablen
+            let tiltLR = 0; // Gamma (Links/Rechts)
+            let tiltFB = 0; // Beta (Vorne/Hinten)
+
+            // iOS Permission Handler (Wichtig für Apple Geräte)
+            btn.addEventListener('click', () => {
+                if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                    DeviceMotionEvent.requestPermission()
+                        .then(response => {
+                            if (response == 'granted') {
+                                startSensors();
+                            } else {
+                                alert("Sensoren müssen erlaubt sein!");
+                            }
+                        })
+                        .catch(console.error);
                 } else {
-                    // Android / iOS < 13
+                    // Android braucht keine explizite Permission auf Klick
                     startSensors();
-                    btn.style.display = 'none';
                 }
             });
 
             function startSensors() {
-                // 1. Device Motion (Beschleunigung)
-                window.addEventListener('devicemotion', (event) => {
-                    if (!conn || !conn.open) return;
+                // DeviceOrientation: Liefert Rotationsdaten (Lage im Raum)
+                window.addEventListener('deviceorientation', handleOrientation);
+                // DeviceMotion: Liefert Beschleunigungsdaten (Wurfkraft)
+                window.addEventListener('devicemotion', handleMotion);
+                statusEl.innerText = "Sensoren aktiv. Wirf!";
+            }
 
-                    // HIER IST DER FIX:
-                    // Wir nutzen 'acceleration' statt 'accelerationIncludingGravity'
-                    // 'acceleration' ist 0 wenn das Handy liegt.
-                    const acc = event.acceleration; 
+            function handleOrientation(event) {
+                // Wir speichern die aktuelle Lage des Handys
+                if(event.gamma) tiltLR = event.gamma; // Neigung links/rechts (-90 bis 90)
+                if(event.beta) tiltFB = event.beta;   // Neigung vor/zurück (-180 bis 180)
+
+                // Visuelles Feedback auf dem Handy (Ball bewegt sich mit Neigung)
+                // Wir begrenzen die Bewegung visuell etwas
+                visualBall.style.transform = `translate(${tiltLR}px, ${tiltFB-45}px)`;
+            }
+
+            function handleMotion(event) {
+                if (!conn) return;
+
+                // WICHTIG: Wir nutzen 'acceleration' statt 'accelerationIncludingGravity'.
+                // Das entfernt die Erdbeschleunigung (9.81 m/s^2), sodass wir nur die
+                // tatsächliche Wurfkraft des Nutzers messen.
+                const acc = event.acceleration; 
+                if (!acc) return;
+
+                // Berechne die Gesamtkraft des Wurfs (Vektorlänge)
+                // Wir nutzen Pythagoras über alle 3 Achsen (X, Y, Z)
+                const force = Math.sqrt(acc.x*acc.x + acc.y*acc.y + acc.z*acc.z);
+
+                // Wurferkennung
+                if (canThrow && force > throwThreshold) {
+                    canThrow = false;
                     
-                    // Fallback für sehr alte Geräte, die 'acceleration' nicht berechnen können
-                    const x = acc ? acc.x : 0;
-                    const y = acc ? acc.y : 0;
-                    const z = acc ? acc.z : 0;
+                    // Sende alle relevanten Daten an den Desktop
+                    conn.send({
+                        type: 'throw',
+                        force: force,   // Die rohe Kraft
+                        gamma: tiltLR,  // Für Links/Rechts Steuerung
+                        beta: tiltFB    // Für Hoch/Runter Steuerung & Gravity Penalty
+                    });
 
-                    // Visuelles Feedback auf Handy
-                    const force = Math.sqrt(x*x + y*y + z*z);
-                    forceDisplay.innerText = force.toFixed(1);
+                    // Visuelles Feedback (Blitz)
+                    document.body.style.backgroundColor = "#555";
+                    setTimeout(() => { document.body.style.backgroundColor = "#333"; }, 100);
 
-                    // Daten Senden
-                    // Wir holen uns auch die Rotation, da 'devicemotion' auch 'rotationRate' hat,
-                    // aber absolute Orientierung kommt besser aus 'deviceorientation'.
-                });
-
-                // 2. Device Orientation (Lage im Raum)
-                window.addEventListener('deviceorientation', (event) => {
-                    if (!conn || !conn.open) return;
-
-                    // Da wir motion und orientation getrennt bekommen, aber beides brauchen,
-                    // senden wir hier in einem "Rutsch" wenn möglich oder getrennt.
-                    // Einfachheitshalber senden wir hier nur die Orientierung,
-                    // idealerweise cached man beides und sendet 1 Paket pro Frame.
-                    // Aber WebRTC ist schnell genug für getrennte Events bei dieser Demo.
-                    
-                    // Wir müssen warten bis wir auch Motion Daten haben? 
-                    // Nein, wir schicken einfach was wir haben.
-                    
-                    // Um den Netzwerkverkehr nicht zu überfluten, kombinieren wir es NICHT hier,
-                    // sondern nutzen eine globale Variable oder senden direkt.
-                    // Für die Demo senden wir es direkt im Motion Handler (siehe oben Update).
-                    // KORREKTUR: Die Events feuern asynchron. Wir speichern den Status.
-                });
-
-                // Besserer Loop für Datenübertragung (Throttling auf ca 60fps)
-                let lastOrientation = { alpha:0, beta:0, gamma:0 };
-                let lastMotion = { x:0, y:0, z:0 };
-
-                window.addEventListener('deviceorientation', e => {
-                    lastOrientation = { alpha: e.alpha || 0, beta: e.beta || 0, gamma: e.gamma || 0 };
-                });
-
-                window.addEventListener('devicemotion', e => {
-                    const acc = e.acceleration; // Der wichtige Fix!
-                    if(acc) {
-                        lastMotion = { x: acc.x || 0, y: acc.y || 0, z: acc.z || 0 };
-                    }
-                });
-
-                // Sende-Loop (alle 50ms = 20 Updates/sek reicht für WebRTC meist aus)
-                setInterval(() => {
-                    if(conn && conn.open) {
-                        conn.send({
-                            type: 'sensorData',
-                            acc: lastMotion,
-                            rot: lastOrientation
-                        });
-                    }
-                }, 50);
+                    // Cooldown (Verhindert Doppelwürfe)
+                    setTimeout(() => {
+                        canThrow = true;
+                    }, 500);
+                }
             }
         }
     </script>
