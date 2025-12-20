@@ -175,8 +175,10 @@ function resize() {
     // Adjust Tide Speed relative to world
     tide.speed = worldWidth * 0.001;
 
-    // Apply scaling/filter to background context once (persists until resize)
-    bgCtx.filter = 'blur(' + worldWidth * 0.03 + 'px) brightness(2.0) saturate(150%)';
+    // Optimize: Apply filters via CSS instead of Canvas Context. blur(${worldWidth * 0.03}px)
+    // Context filters force re-rasterization every frame (slow). CSS filters run on the compositor (fast/GPU).
+    bgCtx.filter = 'none';
+    bgCanvas.style.filter = ` brightness(2.0) saturate(150%)`;
 
     if (gameState === 'start') {
         player.x = worldWidth / 2;
