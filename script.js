@@ -198,13 +198,13 @@ function generateNextWall() {
 
     if (type === 'vertical') {
         // Vertical walls are thin and tall, good for rebounding
-        w = 30;
-        h = 200 + Math.random() * 200;
+        w = worldWidth * 0.08;
+        h = worldWidth * 0.25 + Math.random() * worldWidth * 0.5;
         x = Math.random() * (worldWidth - w); // Random horizontal position
     } else {
         // Horizontal walls (normal or bouncy) are wider and serve as platforms
-        w = 100 + Math.random() * 200;
-        h = 30;
+        w = worldWidth * 0.25 + Math.random() * worldWidth * 0.5;
+        h = worldWidth * 0.08;
         x = Math.random() * (worldWidth - w);
     }
 
