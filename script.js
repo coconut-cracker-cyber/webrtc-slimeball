@@ -39,6 +39,7 @@ let cameraY = 0;
 let lastTime = 0;
 let worldWidth = 0;
 let worldHeight = 0;
+let frameCount = 0;
 
 // Player & World
 const player = {
@@ -388,7 +389,10 @@ function draw() {
     ctx.restore();
 
     // Use the main canvas as the source for the background
-    if (bgCanvas.width > 0 && bgCanvas.height > 0) {
+    // Optimize: Update background less frequently and apply filter on the small canvas
+    if (frameCount % 4 === 0 && bgCanvas.width > 0 && bgCanvas.height > 0) {
+        // Baking the filter into the small texture is much cheaper than CSS filter on full screen
+        bgCtx.filter = 'blur(4px) brightness(2.0) saturate(150%)';
         bgCtx.drawImage(canvas, 0, 0, bgCanvas.width, bgCanvas.height);
     }
 }
@@ -396,6 +400,7 @@ function draw() {
 function gameLoop(timestamp) {
     const dt = timestamp - lastTime;
     lastTime = timestamp;
+    frameCount++;
     update(dt);
     draw();
     requestAnimationFrame(gameLoop);
@@ -459,7 +464,7 @@ function handleOrientation(event) {
 }
 
 function updateArrowUI() {
-    const rotationDeg = (tiltVector.angle * 180 / Math.PI) + 90;
+    const rotationDeg = (tiltVector.angle * 180 / Math.PI) + 270;
     const scale = tiltVector.magnitude / 50;
     arrow.style.transform = `rotate(${rotationDeg}deg) scaleY(${0.5 + scale * 0.5})`;
 }
