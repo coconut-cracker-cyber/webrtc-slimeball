@@ -23,7 +23,7 @@ const enableSensorsBtn = document.getElementById('enable-sensors-btn');
 // Constants & Config
 const ZOOM = 0.6; // Zoom out
 let GRAVITY = 0.5;
-const FRICTION = 0.975;
+const FRICTION = 0.96;
 let JUMP_FORCE_MULTIPLIER = 0.28;
 let MAX_JUMP_FORCE = 35;
 const TILT_SENSITIVITY = 1.5;
@@ -169,14 +169,14 @@ function resize() {
 
     // Adjust Physics based on World Width (scaling from original reference values)
     GRAVITY = worldWidth * 0.00060;
-    MAX_JUMP_FORCE = worldWidth * 0.2;
-    JUMP_FORCE_MULTIPLIER = worldWidth * 0.00075;
+    MAX_JUMP_FORCE = worldWidth * 0.15;
+    JUMP_FORCE_MULTIPLIER = worldWidth * 0.0007;
 
     // Adjust Tide Speed relative to world
     tide.speed = worldWidth * 0.001;
 
     // Apply scaling/filter to background context once (persists until resize)
-    bgCtx.filter = 'brightness(2.0) saturate(150%)';
+    bgCtx.filter = 'blur(' + worldWidth * 0.03 + 'px) brightness(2.0) saturate(150%)';
 
     if (gameState === 'start') {
         player.x = worldWidth / 2;
@@ -441,69 +441,65 @@ function resetGame() {
     gameState = 'playing';
 }
 
-function draw() {
-    // Clear with Zoom
-    ctx.fillStyle = '#0a0a12';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.save();
-    ctx.scale(ZOOM, ZOOM); // Apply Zoom
-    ctx.translate(0, -cameraY);
+function renderWorld(targetCtx) {
+    targetCtx.save();
+    targetCtx.scale(ZOOM, ZOOM); // Apply Zoom
+    targetCtx.translate(0, -cameraY);
 
     // Draw Walls
     for (let w of walls) {
-        ctx.beginPath();
-        ctx.roundRect(w.x, w.y, w.w, w.h, 5);
+        targetCtx.beginPath();
+        targetCtx.roundRect(w.x, w.y, w.w, w.h, 5);
 
         if (w.type === 'bouncy') {
-            ctx.fillStyle = 'rgba(255, 0, 255, 0.2)';
-            ctx.strokeStyle = '#ff00ff';
-            ctx.shadowColor = '#ff00ff';
+            targetCtx.fillStyle = 'rgba(255, 0, 255, 0.2)';
+            targetCtx.strokeStyle = '#ff00ff';
+            targetCtx.shadowColor = '#ff00ff';
         } else if (w.type === 'vertical') {
-            ctx.fillStyle = 'rgba(255, 255, 0, 0.1)';
-            ctx.strokeStyle = '#ffff00';
-            ctx.shadowColor = '#ffff00';
+            targetCtx.fillStyle = 'rgba(255, 255, 0, 0.1)';
+            targetCtx.strokeStyle = '#ffff00';
+            targetCtx.shadowColor = '#ffff00';
         } else {
-            ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
-            ctx.strokeStyle = '#00ccff';
-            ctx.shadowColor = '#00ccff';
+            targetCtx.fillStyle = 'rgba(0, 255, 255, 0.1)';
+            targetCtx.strokeStyle = '#00ccff';
+            targetCtx.shadowColor = '#00ccff';
         }
 
-        ctx.shadowBlur = 10;
-        ctx.lineWidth = 2;
-        ctx.fill();
-        ctx.stroke();
+        targetCtx.shadowBlur = 10;
+        targetCtx.lineWidth = 2;
+        targetCtx.fill();
+        targetCtx.stroke();
     }
 
     // Draw Player
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = player.color;
-    ctx.fillStyle = player.color;
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-    ctx.fill();
+    targetCtx.shadowBlur = 20;
+    targetCtx.shadowColor = player.color;
+    targetCtx.fillStyle = player.color;
+    targetCtx.beginPath();
+    targetCtx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+    targetCtx.fill();
 
     // Aim Line
     if (player.state === 'stuck') {
         const jumpAngle = tiltVector.angle + Math.PI;
         const lineLen = tiltVector.magnitude * 3;
 
-        ctx.beginPath();
-        ctx.moveTo(player.x, player.y);
-        ctx.lineTo(player.x + Math.cos(jumpAngle) * lineLen, player.y + Math.sin(jumpAngle) * lineLen);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([10, 10]);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        targetCtx.beginPath();
+        targetCtx.moveTo(player.x, player.y);
+        targetCtx.lineTo(player.x + Math.cos(jumpAngle) * lineLen, player.y + Math.sin(jumpAngle) * lineLen);
+        targetCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        targetCtx.lineWidth = 2;
+        targetCtx.setLineDash([10, 10]);
+        targetCtx.stroke();
+        targetCtx.setLineDash([]);
     }
 
     // Draw Tide (The Neon Void)
-    ctx.fillStyle = tide.color;
+    targetCtx.fillStyle = tide.color;
     // Create a glitchy/wavy top
-    ctx.beginPath();
-    ctx.moveTo(0, tide.y + 1000); // Start bottom left
-    ctx.lineTo(0, tide.y); // Top left
+    targetCtx.beginPath();
+    targetCtx.moveTo(0, tide.y + 1000); // Start bottom left
+    targetCtx.lineTo(0, tide.y); // Top left
 
     // Draw wavy top
     const waveRes = 10;
@@ -512,33 +508,49 @@ function draw() {
         let yOffset = Math.sin(x * 0.05 + tide.waveOffset) * 15;
         // Occasional vertical glitch spikes
         if (Math.random() > 0.98) yOffset -= Math.random() * 30; // Spike up
-        ctx.lineTo(x, tide.y + yOffset);
+        targetCtx.lineTo(x, tide.y + yOffset);
     }
 
-    ctx.lineTo(worldWidth, tide.y + 1000); // Bottom right
-    ctx.closePath();
+    targetCtx.lineTo(worldWidth, tide.y + 1000); // Bottom right
+    targetCtx.closePath();
 
     // Gradient fill for the void
-    const tideGrad = ctx.createLinearGradient(0, tide.y, 0, tide.y + 500);
+    const tideGrad = targetCtx.createLinearGradient(0, tide.y, 0, tide.y + 500);
     tideGrad.addColorStop(0, 'rgba(255, 0, 85, 0.6)'); // Top transparency
     tideGrad.addColorStop(0.2, 'rgba(50, 0, 20, 0.9)');
     tideGrad.addColorStop(1, 'rgba(0, 0, 0, 1)');
-    ctx.fillStyle = tideGrad;
-    ctx.fill();
+    targetCtx.fillStyle = tideGrad;
+    targetCtx.fill();
 
     // Top edge glow line
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = '#ff3366';
-    ctx.strokeStyle = '#ff99aa';
-    ctx.lineWidth = 3;
-    ctx.stroke();
+    targetCtx.shadowBlur = 15;
+    targetCtx.shadowColor = '#ff3366';
+    targetCtx.strokeStyle = '#ff99aa';
+    targetCtx.lineWidth = 3;
+    targetCtx.stroke();
 
-    ctx.restore();
-    // Use the main canvas as the source for the background
-    // Optimize: Update background less frequently and apply filter on the small canvas
+    targetCtx.restore();
+}
+
+function draw() {
+    // 1. Draw Game
+    ctx.fillStyle = '#0a0a12';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    renderWorld(ctx);
+
+    // 2. Draw Background (High Quality Vector Stretch)
     if (bgCanvas.width > 0 && bgCanvas.height > 0) {
-        // Filter is already set in resize(), just draw
-        bgCtx.drawImage(canvas, 0, 0, bgCanvas.width, bgCanvas.height);
+        // Clear background
+        bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+
+        bgCtx.save();
+        // Scale to fill the background
+        const scaleX = bgCanvas.width / canvas.width;
+        const scaleY = bgCanvas.height / canvas.height;
+        bgCtx.scale(scaleX, scaleY);
+
+        renderWorld(bgCtx);
+        bgCtx.restore();
     }
 }
 
