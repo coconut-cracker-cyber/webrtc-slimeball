@@ -22,10 +22,10 @@ const enableSensorsBtn = document.getElementById('enable-sensors-btn');
 
 // Constants & Config
 const ZOOM = 0.6; // Zoom out
-const GRAVITY = 0.5;
+let GRAVITY = 0.5;
 const FRICTION = 0.99;
-const JUMP_FORCE_MULTIPLIER = 0.45;
-const MAX_JUMP_FORCE = 35;
+let JUMP_FORCE_MULTIPLIER = 0.45;
+let MAX_JUMP_FORCE = 35;
 const TILT_SENSITIVITY = 1.5;
 const SUBSTEPS = 8; // Physics accuracy
 
@@ -161,8 +161,13 @@ function resize() {
     // Adjust player size relative to world width
     player.radius = worldWidth * 0.025;
 
+    // Adjust Physics based on World Width (scaling from original reference values)
+    GRAVITY = worldWidth * 0.0008;
+    MAX_JUMP_FORCE = worldWidth * 0.055;
+    JUMP_FORCE_MULTIPLIER = worldWidth * 0.00075;
+
     // Apply scaling/filter to background context once (persists until resize)
-    bgCtx.filter = 'blur(' + worldWidth * 0.01 + 'px) brightness(2.0) saturate(150%)';
+    bgCtx.filter = 'blur(' + worldWidth * 0.03 + 'px) brightness(2.0) saturate(150%)';
 
     if (gameState === 'start') {
         player.x = worldWidth / 2;
@@ -175,8 +180,12 @@ function resize() {
 function generateInitialWalls() {
     walls = [];
     // Floor
-    walls.push({ x: 0, y: worldHeight - 50, w: worldWidth, h: 100, type: 'floor' });
-    highestGenY = worldHeight - 50;
+    // Scale floor dimensions relative to worldWidth
+    const floorHeight = worldWidth * 0.15;
+    const floorY = worldHeight - worldWidth * 0.1;
+
+    walls.push({ x: 0, y: floorY, w: worldWidth, h: floorHeight, type: 'floor' });
+    highestGenY = floorY;
 
     for (let i = 0; i < 15; i++) generateNextWall();
 }
@@ -184,7 +193,7 @@ function generateInitialWalls() {
 function generateNextWall() {
     // Determine user progression: calculate a random vertical gap between walls
     // This controls the difficulty and pacing of the climb
-    const gapY = worldWidth * 0.6 + Math.random() * worldWidth * 1.0;
+    const gapY = worldWidth * 0.3 + Math.random() * worldWidth * 0.7;
 
     // Calculate the new wall's Y position relative to the highest generated wall so far
     // Note: The coordinate system is inverted likely (y decreases as you go up), 
