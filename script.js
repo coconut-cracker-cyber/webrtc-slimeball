@@ -158,6 +158,9 @@ function resize() {
     worldWidth = canvas.width / ZOOM;
     worldHeight = canvas.height / ZOOM;
 
+    // Apply scaling/filter to background context once (persists until resize)
+    bgCtx.filter = 'blur(4px) brightness(2.0) saturate(150%)';
+
     if (gameState === 'start') {
         player.x = worldWidth / 2;
         player.y = worldHeight - 150;
@@ -391,8 +394,7 @@ function draw() {
     // Use the main canvas as the source for the background
     // Optimize: Update background less frequently and apply filter on the small canvas
     if (frameCount % 4 === 0 && bgCanvas.width > 0 && bgCanvas.height > 0) {
-        // Baking the filter into the small texture is much cheaper than CSS filter on full screen
-        bgCtx.filter = 'blur(4px) brightness(2.0) saturate(150%)';
+        // Filter is already set in resize(), just draw
         bgCtx.drawImage(canvas, 0, 0, bgCanvas.width, bgCanvas.height);
     }
 }
