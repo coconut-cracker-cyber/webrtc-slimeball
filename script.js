@@ -127,7 +127,7 @@ function resize() {
     // Optimize: Low-res background for blur effect (Fixes lag)
     // We maintain aspect ratio of window to prevent distortion, 
     // but scale down significantly.
-    const bgScale = 0.1;
+    const bgScale = 1.0;
     bgCanvas.width = window.innerWidth * bgScale;
     bgCanvas.height = window.innerHeight * bgScale;
 
@@ -179,28 +179,39 @@ function generateInitialWalls() {
 }
 
 function generateNextWall() {
-    const gapY = 150 + Math.random() * 200; // Vertical distance
+    // Determine user progression: calculate a random vertical gap between walls
+    // This controls the difficulty and pacing of the climb
+    const gapY = 150 + Math.random() * 200;
+
+    // Calculate the new wall's Y position relative to the highest generated wall so far
+    // Note: The coordinate system is inverted likely (y decreases as you go up), 
+    // so we subtract the gap from the highest generated Y
     const y = highestGenY - gapY;
 
+    // Determine the type of wall using a random roll
     const typeRoll = Math.random();
     let type = 'normal';
-    if (typeRoll > 0.7) type = 'bouncy';
-    if (typeRoll > 0.9) type = 'vertical'; // Rare vertical walls
+    if (typeRoll > 0.7) type = 'bouncy'; // 30% chance for a bouncy wall
+    if (typeRoll > 0.9) type = 'vertical'; // 10% chance for a vertical wall (overrides bouncy)
 
     let w, h, x;
 
     if (type === 'vertical') {
+        // Vertical walls are thin and tall, good for rebounding
         w = 30;
         h = 200 + Math.random() * 200;
-        x = Math.random() * (worldWidth - w);
+        x = Math.random() * (worldWidth - w); // Random horizontal position
     } else {
-        // Horizontal (normal or bouncy)
+        // Horizontal walls (normal or bouncy) are wider and serve as platforms
         w = 100 + Math.random() * 200;
         h = 30;
         x = Math.random() * (worldWidth - w);
     }
 
+    // Add the new wall to the walls array to be rendered and simulated
     walls.push({ x, y, w, h, type });
+
+    // Update the tracker for the highest point where we've generated walls
     highestGenY = y;
 }
 
@@ -250,7 +261,15 @@ function update(dt) {
     }
 
     // Camera
+    // --- CAMERA LOGIC ---
+    // The camera follows the player as they climb up.
+    // We target a position slightly below the player's current Y (worldHeight * 0.6 offset)
+    // to keep the player somewhat centered but with more space above to see where to jump next.
     const targetY = player.y - worldHeight * 0.6;
+
+    // Smoothly interpolate the camera's current Y position towards the target Y.
+    // The factor 0.1 determines the "smoothness" or lag of the camera (Linear Interpolation / Lerp).
+    // We only move the camera if the target is higher (smaller Y value) to prevent moving down.
     if (targetY < cameraY) cameraY += (targetY - cameraY) * 0.1;
 
     // Score
