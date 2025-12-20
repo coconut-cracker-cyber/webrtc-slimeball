@@ -23,7 +23,7 @@ const enableSensorsBtn = document.getElementById('enable-sensors-btn');
 // Constants & Config
 const ZOOM = 0.6; // Zoom out
 let GRAVITY = 0.5;
-const FRICTION = 0.99;
+const FRICTION = 0.975;
 let JUMP_FORCE_MULTIPLIER = 0.28;
 let MAX_JUMP_FORCE = 35;
 const TILT_SENSITIVITY = 1.5;
@@ -133,8 +133,6 @@ function setupHostDataListener() {
 
 function resize() {
     // Optimize: Low-res background for blur effect (Fixes lag)
-    // We maintain aspect ratio of window to prevent distortion, 
-    // but scale down significantly.
     const bgScale = 1.0;
     bgCanvas.width = window.innerWidth * bgScale;
     bgCanvas.height = window.innerHeight * bgScale;
@@ -170,15 +168,15 @@ function resize() {
     player.radius = worldWidth * 0.025;
 
     // Adjust Physics based on World Width (scaling from original reference values)
-    GRAVITY = worldWidth * 0.00068;
-    MAX_JUMP_FORCE = worldWidth * 0.070;
-    JUMP_FORCE_MULTIPLIER = worldWidth * 0.00055;
+    GRAVITY = worldWidth * 0.00060;
+    MAX_JUMP_FORCE = worldWidth * 0.2;
+    JUMP_FORCE_MULTIPLIER = worldWidth * 0.00075;
 
     // Adjust Tide Speed relative to world
     tide.speed = worldWidth * 0.001;
 
     // Apply scaling/filter to background context once (persists until resize)
-    bgCtx.filter = 'blur(' + worldWidth * 0.03 + 'px) brightness(2.0) saturate(150%)';
+    bgCtx.filter = 'brightness(2.0) saturate(150%)';
 
     if (gameState === 'start') {
         player.x = worldWidth / 2;
