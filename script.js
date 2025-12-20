@@ -158,8 +158,11 @@ function resize() {
     worldWidth = canvas.width / ZOOM;
     worldHeight = canvas.height / ZOOM;
 
+    // Adjust player size relative to world width
+    player.radius = worldWidth * 0.025;
+
     // Apply scaling/filter to background context once (persists until resize)
-    bgCtx.filter = 'brightness(2.0) saturate(150%)';
+    bgCtx.filter = 'blur(' + worldWidth * 0.01 + 'px) brightness(2.0) saturate(150%)';
 
     if (gameState === 'start') {
         player.x = worldWidth / 2;
@@ -181,7 +184,7 @@ function generateInitialWalls() {
 function generateNextWall() {
     // Determine user progression: calculate a random vertical gap between walls
     // This controls the difficulty and pacing of the climb
-    const gapY = 150 + Math.random() * 200;
+    const gapY = worldWidth * 0.6 + Math.random() * worldWidth * 1.0;
 
     // Calculate the new wall's Y position relative to the highest generated wall so far
     // Note: The coordinate system is inverted likely (y decreases as you go up), 
@@ -198,13 +201,13 @@ function generateNextWall() {
 
     if (type === 'vertical') {
         // Vertical walls are thin and tall, good for rebounding
-        w = worldWidth * 0.08;
-        h = worldWidth * 0.25 + Math.random() * worldWidth * 0.5;
+        w = worldWidth * 0.07;
+        h = worldWidth * 0.10 + Math.random() * worldWidth * 0.5;
         x = Math.random() * (worldWidth - w); // Random horizontal position
     } else {
         // Horizontal walls (normal or bouncy) are wider and serve as platforms
-        w = worldWidth * 0.25 + Math.random() * worldWidth * 0.5;
-        h = worldWidth * 0.08;
+        w = worldWidth * 0.10 + Math.random() * worldWidth * 0.5;
+        h = worldWidth * 0.07;
         x = Math.random() * (worldWidth - w);
     }
 
