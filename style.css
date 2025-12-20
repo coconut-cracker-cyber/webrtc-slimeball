@@ -47,7 +47,7 @@ html {
     height: 100%;
     z-index: 0;
     /* Boost brightness and saturation to make the neon walls pop in the blur */
-    filter: blur(40px) brightness(3.0) saturate(200%);
+    /*filter: blur(40px) brightness(3.0) saturate(200%);*/
     opacity: 0.8;
 }
 
