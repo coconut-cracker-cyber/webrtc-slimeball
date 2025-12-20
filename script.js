@@ -170,9 +170,9 @@ function resize() {
     player.radius = worldWidth * 0.025;
 
     // Adjust Physics based on World Width (scaling from original reference values)
-    GRAVITY = worldWidth * 0.0008;
-    MAX_JUMP_FORCE = worldWidth * 0.030;
-    JUMP_FORCE_MULTIPLIER = worldWidth * 0.00075;
+    GRAVITY = worldWidth * 0.00068;
+    MAX_JUMP_FORCE = worldWidth * 0.070;
+    JUMP_FORCE_MULTIPLIER = worldWidth * 0.00055;
 
     // Adjust Tide Speed relative to world
     tide.speed = worldWidth * 0.001;
