@@ -176,7 +176,7 @@ html {
     border-right: 15px solid transparent;
     border-bottom: 30px solid var(--primary-color);
     position: absolute;
-    transform-origin: center bottom;
+    transform-origin: center center;
     filter: drop-shadow(0 0 10px var(--primary-color));
 }
 
