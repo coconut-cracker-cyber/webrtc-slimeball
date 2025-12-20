@@ -10,6 +10,8 @@ const qrcodeDiv = document.getElementById('qrcode');
 // Game State (Host)
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const bgCanvas = document.getElementById('bg-canvas');
+const bgCtx = bgCanvas.getContext('2d');
 const scoreValue = document.getElementById('score-value');
 
 // Controller State
@@ -106,8 +108,32 @@ function setupHostDataListener() {
 }
 
 function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    // Background always fills screen
+    bgCanvas.width = window.innerWidth;
+    bgCanvas.height = window.innerHeight;
+
+    // Target Aspect Ratio 9:16 (0.5625)
+    // Mobile default typically 9:16 or thinner
+    const targetAspect = 9 / 16;
+    const windowAspect = window.innerWidth / window.innerHeight;
+
+    let targetW, targetH;
+
+    if (windowAspect > targetAspect) {
+        // Window is wider (Desktop/Horizontal) -> Constrain Width by Height
+        targetH = window.innerHeight;
+        targetW = targetH * targetAspect;
+    } else {
+        // Window is taller (Some Phones/Vertical) -> Constrain Height by Width
+        // Or just fill width if we want standard mobile behavior?
+        // User asked to "fix the aspect ratio for narrower screens as well"
+        // so we constrain height too (pillarbox).
+        targetW = window.innerWidth;
+        targetH = targetW / targetAspect;
+    }
+
+    canvas.width = targetW;
+    canvas.height = targetH;
 
     // Calculate World Dimensions based on Zoom
     worldWidth = canvas.width / ZOOM;
@@ -342,6 +368,9 @@ function draw() {
     }
 
     ctx.restore();
+
+    // Render to Background
+    bgCtx.drawImage(canvas, 0, 0, bgCanvas.width, bgCanvas.height);
 }
 
 function gameLoop(timestamp) {

@@ -38,10 +38,30 @@ html {
     position: relative;
 }
 
-canvas {
-    display: block;
+
+#bg-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
+    z-index: 0;
+    filter: blur(30px) brightness(0.7);
+}
+
+#game-container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#gameCanvas {
+    display: block;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
 }
 
 #ui-layer {
