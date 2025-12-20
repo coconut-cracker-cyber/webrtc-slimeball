@@ -387,8 +387,10 @@ function draw() {
 
     ctx.restore();
 
-    // Render to Background
-    bgCtx.drawImage(canvas, 0, 0, bgCanvas.width, bgCanvas.height);
+    // Use the main canvas as the source for the background
+    if (bgCanvas.width > 0 && bgCanvas.height > 0) {
+        bgCtx.drawImage(canvas, 0, 0, bgCanvas.width, bgCanvas.height);
+    }
 }
 
 function gameLoop(timestamp) {
