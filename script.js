@@ -24,7 +24,7 @@ const enableSensorsBtn = document.getElementById('enable-sensors-btn');
 const ZOOM = 0.6; // Zoom out
 let GRAVITY = 0.5;
 const FRICTION = 0.99;
-let JUMP_FORCE_MULTIPLIER = 0.45;
+let JUMP_FORCE_MULTIPLIER = 0.28;
 let MAX_JUMP_FORCE = 35;
 const TILT_SENSITIVITY = 1.5;
 const SUBSTEPS = 8; // Physics accuracy
@@ -50,6 +50,14 @@ const player = {
     vy: 0,
     state: 'stuck',
     color: '#00ff88'
+};
+
+// Ominous Tide (Chaser)
+const tide = {
+    y: 0,
+    speed: 0.2, // Base speed
+    waveOffset: 0,
+    color: '#ff0055'
 };
 
 let walls = [];
@@ -166,12 +174,19 @@ function resize() {
     MAX_JUMP_FORCE = worldWidth * 0.055;
     JUMP_FORCE_MULTIPLIER = worldWidth * 0.00075;
 
+    // Adjust Tide Speed relative to world
+    tide.speed = worldWidth * 0.0015;
+
     // Apply scaling/filter to background context once (persists until resize)
     bgCtx.filter = 'blur(' + worldWidth * 0.03 + 'px) brightness(2.0) saturate(150%)';
 
     if (gameState === 'start') {
         player.x = worldWidth / 2;
         player.y = worldHeight - 150;
+
+        // Reset Tide
+        tide.y = worldHeight + 400; // Start comfortably below
+
         cameraY = 0;
         generateInitialWalls();
     }
@@ -193,7 +208,7 @@ function generateInitialWalls() {
 function generateNextWall() {
     // Determine user progression: calculate a random vertical gap between walls
     // This controls the difficulty and pacing of the climb
-    const gapY = worldWidth * 0.3 + Math.random() * worldWidth * 0.7;
+    const gapY = worldWidth * 0.2 + Math.random() * worldWidth * 0.5;
 
     // Calculate the new wall's Y position relative to the highest generated wall so far
     // Note: The coordinate system is inverted likely (y decreases as you go up), 
@@ -203,20 +218,20 @@ function generateNextWall() {
     // Determine the type of wall using a random roll
     const typeRoll = Math.random();
     let type = 'normal';
-    if (typeRoll > 0.7) type = 'bouncy'; // 30% chance for a bouncy wall
-    if (typeRoll > 0.9) type = 'vertical'; // 10% chance for a vertical wall (overrides bouncy)
+    if (typeRoll > 0.75) type = 'bouncy'; // % chance for a bouncy wall
+    if (typeRoll > 0.83) type = 'vertical'; // % chance for a vertical wall (overrides bouncy)
 
     let w, h, x;
 
     if (type === 'vertical') {
         // Vertical walls are thin and tall, good for rebounding
-        w = worldWidth * 0.07;
+        w = worldWidth * 0.06;
         h = worldWidth * 0.10 + Math.random() * worldWidth * 0.5;
         x = Math.random() * (worldWidth - w); // Random horizontal position
     } else {
         // Horizontal walls (normal or bouncy) are wider and serve as platforms
         w = worldWidth * 0.10 + Math.random() * worldWidth * 0.5;
-        h = worldWidth * 0.07;
+        h = worldWidth * 0.06;
         x = Math.random() * (worldWidth - w);
     }
 
@@ -243,6 +258,16 @@ function jump() {
 function update(dt) {
     if (gameState !== 'playing') return;
 
+    // Update Tide
+    tide.y -= tide.speed;
+    tide.waveOffset += 0.1;
+
+    // Tide Collision
+    // If player touches the tide (plus a bit of leeway for the wave peaks)
+    if (player.y + player.radius > tide.y + 20) {
+        gameOver();
+    }
+
     // Physics Sub-stepping
     if (player.state === 'air') {
         const stepDt = 1 / SUBSTEPS; // Normalized step
@@ -268,8 +293,8 @@ function update(dt) {
             }
         }
 
-        // Game Over
-        if (player.y - player.radius > cameraY + worldHeight + 200) gameOver();
+        // Game Over - as soon as the top of the ball leaves the visual area
+        if (player.y - player.radius > cameraY + worldHeight) gameOver();
     }
 
     // Camera
@@ -419,6 +444,41 @@ function draw() {
         ctx.stroke();
         ctx.setLineDash([]);
     }
+
+    // Draw Tide (The Neon Void)
+    ctx.fillStyle = tide.color;
+    // Create a glitchy/wavy top
+    ctx.beginPath();
+    ctx.moveTo(0, tide.y + 1000); // Start bottom left
+    ctx.lineTo(0, tide.y); // Top left
+
+    // Draw wavy top
+    const waveRes = 10;
+    for (let x = 0; x <= worldWidth; x += waveRes) {
+        // Sine wave + random glitch
+        let yOffset = Math.sin(x * 0.05 + tide.waveOffset) * 15;
+        // Occasional vertical glitch spikes
+        if (Math.random() > 0.98) yOffset -= Math.random() * 30; // Spike up
+        ctx.lineTo(x, tide.y + yOffset);
+    }
+
+    ctx.lineTo(worldWidth, tide.y + 1000); // Bottom right
+    ctx.closePath();
+
+    // Gradient fill for the void
+    const tideGrad = ctx.createLinearGradient(0, tide.y, 0, tide.y + 500);
+    tideGrad.addColorStop(0, 'rgba(255, 0, 85, 0.6)'); // Top transparency
+    tideGrad.addColorStop(0.2, 'rgba(50, 0, 20, 0.9)');
+    tideGrad.addColorStop(1, 'rgba(0, 0, 0, 1)');
+    ctx.fillStyle = tideGrad;
+    ctx.fill();
+
+    // Top edge glow line
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#ff3366';
+    ctx.strokeStyle = '#ff99aa';
+    ctx.lineWidth = 3;
+    ctx.stroke();
 
     ctx.restore();
     // Use the main canvas as the source for the background
