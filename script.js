@@ -23,7 +23,7 @@ const enableSensorsBtn = document.getElementById('enable-sensors-btn');
 // Constants & Config
 const ZOOM = 0.6; // Zoom out
 let GRAVITY = 0.53;
-const FRICTION = 0.95;
+const FRICTION = 0.998;
 let JUMP_FORCE_MULTIPLIER = 0.28;
 let MAX_JUMP_FORCE = 30;
 const TILT_SENSITIVITY = 1.5;
