@@ -26,12 +26,14 @@ const enableSensorsBtn = document.getElementById('enable-sensors-btn');
 
 // Constants & Config
 const CONFIG = {
+    // Fixed visual/game constants (do not scale with screen size)
     zoom: 0.6,
     substeps: 8,
     friction: 0.998,
     tiltSensitivity: 1.5,
+    blur: 20, // Fixed blur in pixels for background effect
 
-    // Ratios relative to World Width
+    // Ratios relative to World Width (these scale with screen size)
     ratios: {
         gravity: 0.00060,
         jumpForceMult: 0.0007,
@@ -43,8 +45,7 @@ const CONFIG = {
         wallHeight: 0.05,
         wallWidthMin: 0.10,
         wallWidthRange: 0.5,
-        playerRadius: 0.025,
-        blur: 0.03
+        playerRadius: 0.025
     },
 
     colors: {
@@ -179,18 +180,17 @@ function resize() {
     lastWindowWidth = window.innerWidth;
     lastWindowHeight = window.innerHeight;
 
-    // Optimize: Low-res background for blur effect (Fixes lag)
+    // ===== SETUP CANVAS DIMENSIONS =====
+    // Background canvas for blur effect
     const bgScale = 1.0;
     bgCanvas.width = window.innerWidth * bgScale;
     bgCanvas.height = window.innerHeight * bgScale;
 
     // Target Aspect Ratio 9:16 (0.5625)
-    // Mobile default typically 9:16 or thinner
     const targetAspect = 9 / 16;
     const windowAspect = window.innerWidth / window.innerHeight;
 
     let targetW, targetH;
-
     if (windowAspect > targetAspect) {
         // Window is wider (Desktop/Horizontal) -> Constrain Width by Height
         targetH = window.innerHeight;
@@ -207,24 +207,34 @@ function resize() {
     canvas.width = targetW;
     canvas.height = targetH;
 
-    // Calculate World Dimensions based on Zoom
+    // ===== CALCULATE NEW WORLD DIMENSIONS =====
     worldWidth = canvas.width / ZOOM;
     worldHeight = canvas.height / ZOOM;
 
-    // Scale Entities if playing (and world existed previously)
+    // ===== SCALE ALL POSITION/SIZE VARIABLES =====
+    // If game is active and world previously existed, scale all game entities
     if (gameState !== 'start' && oldWorldWidth > 0) {
         const ratio = worldWidth / oldWorldWidth;
 
+        // Scale Player Position & Velocity
         player.x *= ratio;
         player.y *= ratio;
         player.vx *= ratio;
         player.vy *= ratio;
 
+        // Scale Tide Position
         tide.y *= ratio;
+
+        // Scale Camera Position
         cameraY *= ratio;
+
+        // Scale Wall Generation Tracker
         highestGenY *= ratio;
+
+        // Scale Score Calculation
         scoreDivisor *= ratio;
 
+        // Scale All Wall Positions & Dimensions
         walls.forEach(w => {
             w.x *= ratio;
             w.y *= ratio;
@@ -233,45 +243,38 @@ function resize() {
         });
     }
 
-    // Adjust player size relative to world width
+    // ===== UPDATE SIZE-DEPENDENT VARIABLES =====
+    // Variables that should always match current world dimensions
+
+    // Player size (relative to world width)
     player.radius = worldWidth * CONFIG.ratios.playerRadius;
 
-    // Adjust Physics based on World Width
+    // Physics forces (scaled to world size for consistent feel)
     GRAVITY = worldWidth * CONFIG.ratios.gravity;
     MAX_JUMP_FORCE = worldWidth * CONFIG.ratios.maxJumpForce;
     JUMP_FORCE_MULTIPLIER = worldWidth * CONFIG.ratios.jumpForceMult;
 
-    // Adjust Tide Speed relative to world
+    // Tide speed (scaled to world size)
     tide.speed = worldWidth * CONFIG.ratios.tideSpeed;
 
-    // Optimize: Apply filters via CSS
+    // ===== APPLY FIXED VISUAL EFFECTS =====
+    // These do NOT scale with world size
     bgCtx.filter = 'none';
-    bgCanvas.style.filter = `blur(${worldWidth * CONFIG.ratios.blur}px) brightness(2.0) saturate(150%)`;
+    bgCanvas.style.filter = `blur(${CONFIG.blur}px) brightness(2.0) saturate(150%)`;
 
+    // ===== INITIALIZE GAME START STATE =====
     if (gameState === 'start') {
+        // Set initial player position (center-bottom of world)
         player.x = worldWidth / 2;
         player.y = worldHeight - 150;
 
-        // Reset Score Divisor to default scaling logic if needed, or keeping it persisted is fine 
-        // as long as 10 was the base for the initial worldWidth. 
-        // But since worldWidth changes on start, we might want to reset scoreDivisor base?
-        // Actually, let's just leave it. If we resize at start, we scale it.
-        // But strict reset:
-        scoreDivisor = 10 * (worldWidth / (canvas.width / ZOOM)); // Wait, worldWidth IS canvas.width/ZOOM. 
-        // Just keeping it 10 is risky if we start on a huge screen.
-        // Let's rely on scaling. If we hard reset to 10 here, we assume standard start res.
-        // It's safer to not touch scoreDivisor here if we assume it was initialized correctly (10) 
-        // AND scaled if the window started different?
-        // Actually, init calls resize. ratio is 1 (old 0). scoreDivisor stays 10.
-        // Perfect for initial state.
+        // Initialize tide position (below screen)
+        tide.y = worldHeight + 400;
 
-        player.x = worldWidth / 2;
-        player.y = worldHeight - 150;
-
-        // Reset Tide
-        tide.y = worldHeight + 400; // Start comfortably below
-
+        // Reset camera to origin
         cameraY = 0;
+
+        // Generate initial level
         generateInitialWalls();
     }
 }

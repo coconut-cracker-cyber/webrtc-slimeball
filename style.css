@@ -237,11 +237,13 @@ html {
 }
 
 #enable-sensors-btn {
-    /* Inherits via mixed usage if we applied class, but keeping specific ID just in case specific overrides needed later, 
-       otherwise it can just use the class in HTML. For now this ID selector acts as a backup or specific override. 
-       Actually, let's just make the ID rules map to the same styles or rely on the class. 
-       Since I can't easily change the HTML for enable-sensors-btn in this tool call (I already did index), 
-       I will just copy styles or group them. */
+    background: var(--primary-color);
+    border: none;
+    padding: 20px 40px;
+    font-size: 20px;
+    font-weight: bold;
+    border-radius: 30px;
+    color: #000;
 }
 
 /* Grouping #enable-sensors-btn with .btn-primary logic would be cleaner but let's just append the new class definitions */
