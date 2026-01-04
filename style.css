@@ -86,7 +86,8 @@ html {
     text-shadow: 0 0 10px var(--primary-glow);
 }
 
-#connection-screen {
+#connection-screen,
+#game-over-screen {
     position: absolute;
     top: 0;
     left: 0;
@@ -217,7 +218,7 @@ html {
     z-index: 200;
 }
 
-#enable-sensors-btn {
+.btn-primary {
     background: var(--primary-color);
     border: none;
     padding: 20px 40px;
@@ -225,4 +226,22 @@ html {
     font-weight: bold;
     border-radius: 30px;
     color: #000;
+    cursor: pointer;
+    font-family: var(--font-main);
+    transition: transform 0.1s;
 }
+
+.btn-primary:active {
+    transform: scale(0.95);
+    opacity: 0.9;
+}
+
+#enable-sensors-btn {
+    /* Inherits via mixed usage if we applied class, but keeping specific ID just in case specific overrides needed later, 
+       otherwise it can just use the class in HTML. For now this ID selector acts as a backup or specific override. 
+       Actually, let's just make the ID rules map to the same styles or rely on the class. 
+       Since I can't easily change the HTML for enable-sensors-btn in this tool call (I already did index), 
+       I will just copy styles or group them. */
+}
+
+/* Grouping #enable-sensors-btn with .btn-primary logic would be cleaner but let's just append the new class definitions */

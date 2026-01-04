@@ -13,6 +13,10 @@ const ctx = canvas.getContext('2d');
 const bgCanvas = document.getElementById('bg-canvas');
 const bgCtx = bgCanvas.getContext('2d');
 const scoreValue = document.getElementById('score-value');
+// Game Over UI
+const gameOverScreen = document.getElementById('game-over-screen');
+const finalScoreEl = document.getElementById('final-score');
+const restartBtn = document.getElementById('restart-btn');
 
 // Controller State
 const arrow = document.getElementById('arrow');
@@ -21,13 +25,44 @@ const startOverlay = document.getElementById('start-overlay');
 const enableSensorsBtn = document.getElementById('enable-sensors-btn');
 
 // Constants & Config
-const ZOOM = 0.6; // Zoom out
+const CONFIG = {
+    zoom: 0.6,
+    substeps: 8,
+    friction: 0.998,
+    tiltSensitivity: 1.5,
+
+    // Ratios relative to World Width
+    ratios: {
+        gravity: 0.00060,
+        jumpForceMult: 0.0007,
+        maxJumpForce: 0.15,
+        tideSpeed: 0.001,
+        tideCatchup: 0.005,
+        wallGapMin: 0.2,
+        wallGapRange: 0.4,
+        wallHeight: 0.05,
+        wallWidthMin: 0.10,
+        wallWidthRange: 0.5,
+        playerRadius: 0.025,
+        blur: 0.03
+    },
+
+    colors: {
+        player: '#00ff88',
+        tide: '#ff0055',
+        wallNormal: { fill: 'rgba(0, 255, 255, 0.1)', stroke: '#00ccff', shadow: '#00ccff' },
+        wallBouncy: { fill: 'rgba(255, 0, 255, 0.2)', stroke: '#ff00ff', shadow: '#ff00ff' },
+        wallVertical: { fill: 'rgba(255, 255, 0, 0.1)', stroke: '#ffff00', shadow: '#ffff00' }
+    }
+};
+
+const ZOOM = CONFIG.zoom;
 let GRAVITY = 0.53;
-const FRICTION = 0.998;
+const FRICTION = CONFIG.friction;
 let JUMP_FORCE_MULTIPLIER = 0.28;
 let MAX_JUMP_FORCE = 30;
-const TILT_SENSITIVITY = 1.5;
-const SUBSTEPS = 8; // Physics accuracy
+const TILT_SENSITIVITY = CONFIG.tiltSensitivity;
+const SUBSTEPS = CONFIG.substeps;
 
 // Variables
 let peer;
@@ -83,6 +118,9 @@ function init() {
 function initHost() {
     isHost = true;
     hostView.classList.remove('hidden');
+
+    // Bind Restart
+    restartBtn.addEventListener('click', resetGame);
 
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('debug')) {
@@ -196,20 +234,19 @@ function resize() {
     }
 
     // Adjust player size relative to world width
-    player.radius = worldWidth * 0.025;
+    player.radius = worldWidth * CONFIG.ratios.playerRadius;
 
-    // Adjust Physics based on World Width (scaling from original reference values)
-    GRAVITY = worldWidth * 0.00060;
-    MAX_JUMP_FORCE = worldWidth * 0.15;
-    JUMP_FORCE_MULTIPLIER = worldWidth * 0.0007;
+    // Adjust Physics based on World Width
+    GRAVITY = worldWidth * CONFIG.ratios.gravity;
+    MAX_JUMP_FORCE = worldWidth * CONFIG.ratios.maxJumpForce;
+    JUMP_FORCE_MULTIPLIER = worldWidth * CONFIG.ratios.jumpForceMult;
 
     // Adjust Tide Speed relative to world
-    tide.speed = worldWidth * 0.001;
+    tide.speed = worldWidth * CONFIG.ratios.tideSpeed;
 
-    // Optimize: Apply filters via CSS instead of Canvas Context. blur(${worldWidth * 0.03}px)
-    // Context filters force re-rasterization every frame (slow). CSS filters run on the compositor (fast/GPU).
+    // Optimize: Apply filters via CSS
     bgCtx.filter = 'none';
-    bgCanvas.style.filter = `blur(${worldWidth * 0.03}px) brightness(2.0) saturate(150%)`;
+    bgCanvas.style.filter = `blur(${worldWidth * CONFIG.ratios.blur}px) brightness(2.0) saturate(150%)`;
 
     if (gameState === 'start') {
         player.x = worldWidth / 2;
@@ -254,8 +291,7 @@ function generateInitialWalls() {
 
 function generateNextWall() {
     // Determine user progression: calculate a random vertical gap between walls
-    // This controls the difficulty and pacing of the climb
-    const gapY = worldWidth * 0.2 + Math.random() * worldWidth * 0.4;
+    const gapY = worldWidth * CONFIG.ratios.wallGapMin + Math.random() * worldWidth * CONFIG.ratios.wallGapRange;
 
     // Calculate the new wall's Y position relative to the highest generated wall so far
     // Note: The coordinate system is inverted likely (y decreases as you go up), 
@@ -271,14 +307,14 @@ function generateNextWall() {
     let w, h, x;
 
     if (type === 'vertical') {
-        // Vertical walls are thin and tall, good for rebounding
-        w = worldWidth * 0.05;
+        // Vertical walls are thin and tall
+        w = worldWidth * CONFIG.ratios.wallHeight; // Width is height ratio
         h = worldWidth * 0.10 + Math.random() * worldWidth * 0.5;
-        x = Math.random() * (worldWidth - w); // Random horizontal position
+        x = Math.random() * (worldWidth - w);
     } else {
-        // Horizontal walls (normal or bouncy) are wider and serve as platforms
-        w = worldWidth * 0.10 + Math.random() * worldWidth * 0.5;
-        h = worldWidth * 0.05;
+        // Horizontal walls
+        w = worldWidth * CONFIG.ratios.wallWidthMin + Math.random() * worldWidth * CONFIG.ratios.wallWidthRange;
+        h = worldWidth * CONFIG.ratios.wallHeight;
         x = Math.random() * (worldWidth - w);
     }
 
@@ -314,8 +350,7 @@ function update(dt) {
 
     if (distToTide > catchUpThreshold) {
         // Boost speed proportional to distance
-        // e.g. add 0.05% of the excess distance per frame
-        currentSpeed += (distToTide - catchUpThreshold) * 0.005;
+        currentSpeed += (distToTide - catchUpThreshold) * CONFIG.ratios.tideCatchup;
     }
 
     tide.y -= currentSpeed;
@@ -478,11 +513,12 @@ function checkCollisions() {
 
 function gameOver() {
     gameState = 'gameover';
-    alert(`Game Over! Height: ${score}m`);
-    resetGame();
+    finalScoreEl.textContent = score + 'm';
+    gameOverScreen.classList.remove('hidden');
 }
 
 function resetGame() {
+    gameOverScreen.classList.add('hidden');
     gameState = 'start';
     score = 0;
     scoreValue.textContent = '0m';
@@ -513,17 +549,17 @@ function renderWorld(targetCtx) {
         targetCtx.roundRect(w.x, w.y, w.w, w.h, 5);
 
         if (w.type === 'bouncy') {
-            targetCtx.fillStyle = 'rgba(255, 0, 255, 0.2)';
-            targetCtx.strokeStyle = '#ff00ff';
-            targetCtx.shadowColor = '#ff00ff';
+            targetCtx.fillStyle = CONFIG.colors.wallBouncy.fill;
+            targetCtx.strokeStyle = CONFIG.colors.wallBouncy.stroke;
+            targetCtx.shadowColor = CONFIG.colors.wallBouncy.shadow;
         } else if (w.type === 'vertical') {
-            targetCtx.fillStyle = 'rgba(255, 255, 0, 0.1)';
-            targetCtx.strokeStyle = '#ffff00';
-            targetCtx.shadowColor = '#ffff00';
+            targetCtx.fillStyle = CONFIG.colors.wallVertical.fill;
+            targetCtx.strokeStyle = CONFIG.colors.wallVertical.stroke;
+            targetCtx.shadowColor = CONFIG.colors.wallVertical.shadow;
         } else {
-            targetCtx.fillStyle = 'rgba(0, 255, 255, 0.1)';
-            targetCtx.strokeStyle = '#00ccff';
-            targetCtx.shadowColor = '#00ccff';
+            targetCtx.fillStyle = CONFIG.colors.wallNormal.fill;
+            targetCtx.strokeStyle = CONFIG.colors.wallNormal.stroke;
+            targetCtx.shadowColor = CONFIG.colors.wallNormal.shadow;
         }
 
         targetCtx.shadowBlur = 10;
