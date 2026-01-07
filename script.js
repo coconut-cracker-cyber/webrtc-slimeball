@@ -51,7 +51,7 @@ const Config = {
         TIDE_COLLISION_THRESHOLD: 0.03, // relative to World Width
         CAMERA_LIMIT_PADDING: 0.1,    // relative to World Height
         GEN_TRIGGER_DIST: 1.2,        // relative to World Height
-        CLEANUP_DIST: 0.3,            // relative to World Height
+        CLEANUP_DIST: 1.0,            // relative to World Height
         STICKY_DRAG: 1.5,             // Viscosity factor for sticky state
         STICKY_RELEASE_FORCE: 0.5     // Required force to break free purely by movement
     },
@@ -779,10 +779,10 @@ class Renderer {
     updateDangerUI(game) {
         const screenBottomY = game.camera.y + game.worldHeight;
         const proximity = game.tide.y - screenBottomY;
-        const dangerZone = 300;
+        const dangerZone = game.worldHeight * 0.3; // Responsive danger zone
 
         if (proximity < dangerZone) {
-            let intensity = 1 - ((proximity + 200) / (dangerZone + 200));
+            let intensity = 1 - ((proximity + game.worldHeight * 0.2) / (dangerZone + game.worldHeight * 0.2));
             intensity = Math.max(0, Math.min(1, intensity));
 
             const r = 255;
@@ -791,10 +791,10 @@ class Renderer {
             const a = 0.3 + (intensity * 0.5);
 
             this.canvas.style.borderColor = `rgba(${r}, ${g}, ${b}, ${a})`;
-            this.canvas.style.boxShadow = `0 0 ${50 + intensity * 50}px rgba(${r}, 0, 0, ${0.9 * intensity})`;
+            this.canvas.style.boxShadow = `0 0 ${5 + intensity * 5}vmin rgba(${r}, 0, 0, ${0.9 * intensity})`;
         } else {
             this.canvas.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-            this.canvas.style.boxShadow = '0 0 50px rgba(0, 0, 0, 0.9)';
+            this.canvas.style.boxShadow = '0 0 5vmin rgba(0, 0, 0, 0.9)';
         }
     }
 }
@@ -849,6 +849,13 @@ class Game {
         this.net.on('readyToStart', () => {
             document.getElementById('connection-screen').classList.add('hidden');
             this.startGame();
+        });
+
+        // Restart from Controller
+        this.net.on('data', (d) => {
+            if (d.type === 'restart') {
+                this.resetGame();
+            }
         });
 
         // Input Jump
@@ -1073,18 +1080,13 @@ class Game {
             this.player.checkBounds(this.worldWidth);
         }
 
-        // Fall Death (Off bottom of screen relative to camera)
-        // Actually, Tide is the killer, but if they fall excessively fast past camera? 
-        // Logic kept from original:
-        if (this.player.y - this.player.radius > this.camera.y + this.worldHeight) {
-            this.gameOver();
-        }
     }
 
     gameOver() {
         this.state = 'gameover';
         this.finalScoreEl.textContent = this.score + 'm';
         this.gameOverScreen.classList.remove('hidden');
+        this.net.send({ type: 'gameover' });
     }
 }
 
@@ -1101,6 +1103,8 @@ class ControllerApp {
         this.arrow = document.getElementById('arrow');
         this.jumpBtn = document.getElementById('jump-btn');
         this.startOverlay = document.getElementById('start-overlay');
+        this.restartOverlay = document.getElementById('restart-overlay');
+        this.restartBtn = document.getElementById('phone-restart-btn');
         this.tiltVector = { x: 0, y: 0, magnitude: 0, angle: 0 };
 
         this.init(hostId);
@@ -1121,10 +1125,16 @@ class ControllerApp {
         this.net.on('data', (d) => {
             if (d.type === 'vibrate' && navigator.vibrate) {
                 navigator.vibrate(d.duration);
+            } else if (d.type === 'gameover') {
+                this.restartOverlay.classList.remove('hidden');
             }
         });
 
         document.getElementById('enable-sensors-btn').addEventListener('click', () => this.requestPermissions());
+        this.restartBtn.addEventListener('click', () => {
+            this.net.send({ type: 'restart' });
+            this.restartOverlay.classList.add('hidden');
+        });
     }
 
     requestPermissions() {

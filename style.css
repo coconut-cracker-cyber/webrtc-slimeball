@@ -63,8 +63,8 @@ html {
 
 #gameCanvas {
     display: block;
-    box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 5vmin rgba(0, 0, 0, 0.9);
+    border: 0.2vmin solid rgba(255, 255, 255, 0.3);
     background-color: var(--bg-color);
 }
 
@@ -79,11 +79,13 @@ html {
 
 #score-container {
     position: absolute;
-    top: 20px;
-    left: 20px;
-    font-size: 24px;
+    top: max(4vmin, env(safe-area-inset-top) + 2vmin);
+    left: max(4vmin, env(safe-area-inset-left) + 2vmin);
+    font-size: 4vmin;
     font-weight: 700;
-    text-shadow: 0 0 10px var(--primary-glow);
+    text-shadow: 0 0 1vmin var(--primary-glow);
+    white-space: nowrap;
+    z-index: 10;
 }
 
 #connection-screen,
@@ -97,7 +99,7 @@ html {
     align-items: center;
     justify-content: center;
     background: rgba(10, 10, 18, 0.8);
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(1vmin);
     z-index: 100;
     pointer-events: auto;
     transition: opacity 0.5s;
@@ -106,17 +108,17 @@ html {
 .glass-panel {
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
-    padding: 40px;
-    border-radius: 20px;
+    padding: 5vmin;
+    border-radius: 3vmin;
     text-align: center;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 1vmin 3vmin rgba(0, 0, 0, 0.5);
 }
 
 #qrcode {
     background: white;
-    padding: 10px;
-    border-radius: 10px;
-    margin: 20px auto;
+    padding: 2vmin;
+    border-radius: 1.5vmin;
+    margin: 4vmin auto;
     width: fit-content;
 }
 
@@ -126,8 +128,8 @@ html {
 
 .status {
     color: #ccc;
-    font-size: 14px;
-    margin-top: 10px;
+    font-size: 3vmin;
+    margin-top: 2vmin;
 }
 
 /* CONTROLLER VIEW */
@@ -139,7 +141,7 @@ html {
     flex-direction: column;
     align-items: center;
     justify-content: space-between;
-    padding: 40px 20px;
+    padding: 4vmin 2vmin;
 }
 
 #controller-container {
@@ -155,12 +157,12 @@ html {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 15px;
+    gap: 1.5vmin;
 }
 
 #tilt-ring {
-    width: 150px;
-    height: 150px;
+    width: 30vmin;
+    height: 30vmin;
     border-radius: 50%;
     border: 2px solid var(--glass-border);
     background: rgba(255, 255, 255, 0.05);
@@ -173,22 +175,22 @@ html {
 #arrow {
     width: 0;
     height: 0;
-    border-left: 15px solid transparent;
-    border-right: 15px solid transparent;
-    border-bottom: 30px solid var(--primary-color);
+    border-left: 1.5vmin solid transparent;
+    border-right: 1.5vmin solid transparent;
+    border-bottom: 3vmin solid var(--primary-color);
     position: absolute;
     transform-origin: center center;
-    filter: drop-shadow(0 0 10px var(--primary-color));
+    filter: drop-shadow(0 0 1vmin var(--primary-color));
 }
 
 #jump-btn {
-    width: 200px;
-    height: 200px;
+    width: 40vmin;
+    height: 40vmin;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--primary-color), #00ccff);
     border: none;
-    box-shadow: 0 0 30px var(--primary-glow);
-    font-size: 32px;
+    box-shadow: 0 0 3vmin var(--primary-glow);
+    font-size: 6vmin;
     font-weight: 800;
     color: #000;
     font-family: var(--font-main);
@@ -221,10 +223,10 @@ html {
 .btn-primary {
     background: var(--primary-color);
     border: none;
-    padding: 20px 40px;
-    font-size: 20px;
+    padding: 3vmin 6vmin;
+    font-size: 4vmin;
     font-weight: bold;
-    border-radius: 30px;
+    border-radius: 3vmin;
     color: #000;
     cursor: pointer;
     font-family: var(--font-main);
@@ -239,10 +241,10 @@ html {
 #enable-sensors-btn {
     background: var(--primary-color);
     border: none;
-    padding: 20px 40px;
-    font-size: 20px;
+    padding: 3vmin 6vmin;
+    font-size: 4vmin;
     font-weight: bold;
-    border-radius: 30px;
+    border-radius: 3vmin;
     color: #000;
 }
 
